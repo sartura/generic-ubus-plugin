@@ -1,0 +1,69 @@
+module terastream-generic-ubus {
+     yang-version 1.1;
+     namespace "https://terastream/ns/yang/terastream-generic-ubus";
+     prefix "ts-gu";
+
+     // organization "";
+     // contact "";
+
+     description
+          "The module enables users to define necessary information for the
+          generic ubus plugin. The informations for the generic ubus plugins
+          are as follows:
+               - mapping between ubus object and the YANG module for the
+                 ubus object
+               - methods (name and arguments) for an ubus object
+
+          Additionaly RPC are defined for ubus objects that do not have a YANG
+          module specified.
+          ";
+
+     revision "2019-03-20" {
+          description "Initial revision.";
+     }
+
+     container generic-ubus-config {
+          description
+               "Container for holding the necessary information for the
+               generic ubus plugin.";
+          list ubus-object {
+               description
+                    "List for every object for which the user wants to get the
+                    state data. For every list ubus-object name and yang module
+                    to use for the state data is mandatory. Method doesn't need
+                    to be specified which means that NO method
+                    will be executed.";
+               key name;
+               leaf name {
+                    description "Ubus object name.";
+                    mandatory true;
+                    type string;
+               }
+                leaf yang-module {
+                    description "Yang module name";
+                    mandatory true;
+                    type string;
+               }
+               list method {
+                    description
+                         "List of every method to be executon on a ubus object.
+                         If a method is specified the method name is mandatory.
+                         Method messagge is the method argument in JSON format.
+                         The messagge doesn't have to be specified in that case
+                         it will be treated as an empty JSON object ( '{}' ).";
+                    key name;
+                    leaf name {
+                         description "Ubus object method name.";
+                         mandatory true;
+                         type string;
+                    }
+                    leaf message {
+                         description
+                              "Message to be passed to the ubus object method";
+                         type string;
+                    }
+               }
+          }
+     }
+     // TODO: add rpc-s
+}
