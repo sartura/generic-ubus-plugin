@@ -154,9 +154,9 @@ int context_delete_ubus_object(context_t *context, const char *ubus_object_name)
     rc = context_get_ubus_object(context, ubus_object, ubus_object_name);
     CHECK_RET(rc, cleanup, "ubus method %s not found", ubus_object_name);
 
+    // TODO: fix this segmentation fault
     list_del(&ubus_object->list);
     ubus_object_destroy(&ubus_object);
-
 
 cleanup:
     return rc;
@@ -208,13 +208,13 @@ void context_destroy(context_t **context)
             rc = sr_unsubscribe((*context)->session, (*context)->subscription);
             if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
         }
-/*
+#if PLUGIN
         if ((*context)->session != NULL)
         {
             rc = sr_session_stop((*context)->session);
             if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
         }
-*/
+#endif
     }
     free(*context);
     *context = NULL;

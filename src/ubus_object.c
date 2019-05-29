@@ -2,18 +2,18 @@
 
 #include "ubus_object.h"
 
-int ubus_object_create(ubus_object_t **ubus_object, const char *name, const char *yang_module)
+int ubus_object_create(ubus_object_t **ubus_object)
 {
     int rc = 0;
     char *name_local = NULL;
     char *yang_module_local = NULL;
 
-    CHECK_NULL_MSG(name, &rc, cleanup, "input argument name is null");
-    CHECK_NULL_MSG(yang_module, &rc, cleanup, "input argument yang_module is null");
+//    CHECK_NULL_MSG(name, &rc, cleanup, "input argument name is null");
+//    CHECK_NULL_MSG(yang_module, &rc, cleanup, "input argument yang_module is null");
 
     *ubus_object = calloc(1, sizeof(ubus_object_t));
     CHECK_NULL_MSG(*ubus_object, &rc, cleanup, "return argument ubus_object is null");
-
+/*
     name_local = calloc(strlen(name), sizeof(char));
     CHECK_NULL_MSG(name_local, &rc, cleanup, "memory allocation for name failed");
     yang_module_local = calloc(strlen(yang_module), sizeof(char));
@@ -21,9 +21,10 @@ int ubus_object_create(ubus_object_t **ubus_object, const char *name, const char
 
     strncpy(name_local, name, strlen(name_local));
     strncpy(yang_module_local, yang_module, strlen(yang_module_local));
+*/
+    (*ubus_object)->name = NULL;
+    (*ubus_object)->yang_module = NULL;
 
-    (*ubus_object)->name = name_local;
-    (*ubus_object)->yang_module = yang_module_local;
     INIT_LIST_HEAD(&((*ubus_object)->ubus_method_list));
 
     return rc;
@@ -34,6 +35,39 @@ cleanup:
     free(ubus_object);
     return rc;
 }
+
+int ubus_object_set_name(ubus_object_t *ubus_object, const char *name)
+{
+    int rc = 0;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(name, &rc, cleanup, "input argument name is null");
+
+    char *name_local = calloc(strlen(name), sizeof(char));
+    CHECK_NULL_MSG(name_local, &rc, cleanup, "memory allocation for name failed");
+
+    if (ubus_object->name != NULL) free(ubus_object->name);
+    ubus_object->name = name_local;
+
+cleanup:
+    return rc;
+}
+
+int ubus_object_set_yang_module(ubus_object_t *ubus_object, const char *yang_module)
+{
+    int rc = 0;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(yang_module, &rc, cleanup, "input argument yang_module is null");
+
+    char *yang_module_local = calloc(strlen(yang_module), sizeof(char));
+    CHECK_NULL_MSG(yang_module_local, &rc, cleanup, "memory allocation for yang_module failed");
+
+    if (ubus_object->yang_module != NULL) free(ubus_object->yang_module);
+    ubus_object->yang_module = yang_module_local;
+
+cleanup:
+    return rc;
+}
+
 /*
 int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, void (*f)())
 {
@@ -166,8 +200,10 @@ void ubus_object_destroy(ubus_object_t **ubus_object)
     {
         free((*ubus_object)->name);
         free((*ubus_object)->yang_module);
-        ubus_object_delete_all_methods(*ubus_object);
+        int rc = ubus_object_delete_all_methods(*ubus_object);
+        CHECK_RET_MSG(rc , cleanup, "ubus object delete all methods error");
     }
+cleanup:
     free(*ubus_object);
     *ubus_object = NULL;
 }

@@ -19,7 +19,9 @@ set(SOURCES
     src/ubus_method.h
     src/ubus_object.c
     src/ubus_object.h
-    src/version.h)
+    src/version.h
+    src/xpath.h
+    src/xpath.c)
 
 # git SHA1 hash
 execute_process(COMMAND

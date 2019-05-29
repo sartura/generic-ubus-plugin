@@ -22,8 +22,11 @@ typedef struct ubus_object_s ubus_object_t;
 
 // TODO: refresh using .c definitions
 
-int ubus_object_create(ubus_object_t **ubus_object, const char *name, const char *yang_module);
+//int ubus_object_create(ubus_object_t **ubus_object, const char *name, const char *yang_module);
 //int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, void (*f)());
+int ubus_object_create(ubus_object_t **ubus_object);
+int ubus_object_set_name(ubus_object_t *ubus_object, const char *name);
+int ubus_object_set_yang_module(ubus_object_t *ubus_object, const char *yang_module);
 int ubus_object_unsubscribe(sr_session_ctx_t *session, ubus_object_t *ubus_object);
 int ubus_object_add_method(ubus_object_t *ubus_object, ubus_method_t *ubus_method);
 int ubus_object_delete_method(ubus_object_t *ubus_object, const char *method_name);

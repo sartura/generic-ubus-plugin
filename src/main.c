@@ -109,7 +109,7 @@ static int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_
 	}
 
 	INF_MSG("TODO: apply the changes from yang module");
-	//rc = parse_config(context, module_name, session);
+	rc = generic_ubus_apply_module_changes(context, module_name, session);
 	return rc;
 }
 /*
