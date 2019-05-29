@@ -6,13 +6,31 @@
 
 #include "sysrepo.h"
 
-struct global_ctx_s {
+#include "ubus_object.h"
+
+struct context_s {
 	sr_session_ctx_t *session;			// session for a connection running DS
 	sr_subscription_ctx_t *subscription;	// subscription for generic-ubus
-	sr_session_ctx_t *session_startup;			// session for a connection running DS
-	sr_conn_ctx_t *connection_startup;
-	struct list_head uo_list; // list of all registered ubus_objects
+	sr_session_ctx_t *startup_session;			// session for a connection running DS
+	sr_conn_ctx_t *startup_connection;
+	struct list_head ubus_object_list; // list of all registered ubus_objects
 };
 
-// TODO: add libyang structures for the state data for each registered ubus object
+typedef struct context_s context_t;
+
+int context_create(context_t **context);
+int context_set_session(context_t *context, sr_session_ctx_t *session);
+int context_set_subscription(context_t *context, sr_subscription_ctx_t *subscription);
+int context_set_startup_session(context_t *context, sr_session_ctx_t *session);
+int context_set_startup_connection(context_t *context, sr_conn_ctx_t* connection);
+int context_get_session(context_t *context, sr_session_ctx_t *session);
+int context_get_subscription(context_t *context, sr_subscription_ctx_t *subscription);
+int context_get_startup_session(context_t *context, sr_session_ctx_t *session);
+int context_get_startup_connection(context_t *context, sr_conn_ctx_t* connection);
+int context_get_ubus_object(context_t *context, ubus_object_t *ubus_object, const char *ubus_object_name);
+int context_add_ubus_object(context_t *context, ubus_object_t *ubus_object);
+int context_delete_ubus_object(context_t *context, const char *ubus_object_name);
+int context_delete_all_ubus_object(context_t *context);
+void context_destroy(context_t **context);
+
 #endif /* _CONTEXT_UBUS_H_ */

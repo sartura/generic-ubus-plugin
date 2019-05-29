@@ -2,6 +2,7 @@
 #include "sysrepo.h"
 #include "sysrepo/values.h"
 
+
 int load_startup_datastore(struct global_context_s *ctx)
 {
     // TODO:

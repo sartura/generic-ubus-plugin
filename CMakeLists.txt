@@ -6,13 +6,20 @@ PROJECT(sysrepo-plugin-dt-generic-ubus)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall -g")
 
 set(SOURCES
 	src/generic_ubus.c
     src/generic_ubus.h
-    src/parse.c
-    src/parse.h)
+    src/main.c
+    src/common.h
+    src/context.c
+    src/context.h
+    src/ubus_method.c
+    src/ubus_method.h
+    src/ubus_object.c
+    src/ubus_object.h
+    src/version.h)
 
 # git SHA1 hash
 execute_process(COMMAND

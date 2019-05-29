@@ -3,34 +3,35 @@
 
 #include <libubox/list.h>
 
-#include "sysrepo.h"
-
 #include "common.h"
 #include "ubus_method.h"
-#include "context.h"
-
-// when using name structs starting with 'uo' (ubus object)
 
 // yang module config data
 struct ubus_object_s {
 	char *name;
 	char *yang_module;
 
-	sr_subscription_ctx_t *sd_subscription; // ubus module stade data supscription
+	sr_subscription_ctx_t *state_data_subscription;
 
 	//list structure
-	struct list_head uom_list;
+	struct list_head ubus_method_list;
 	struct list_head list;
 };
 
 typedef struct ubus_object_s ubus_object_t;
 
-ubus_object_t *uo_create(const char *name, const char *yang_module);
-int uo_subscribe(struct global_ctx_s *ctx, ubus_object_t *uo);
-int uo_add_method(struct list_head *head, ubus_method_t *method);
-int uo_get_name();
-int uo_get_yang_module();
-ubus_method_t *uo_get_method(const char *method_name);
-void uo_destroy(struct global_ctx_s *ctx, ubus_object_t *uo);
+// TODO: refresh using .c definitions
+
+int ubus_object_create(ubus_object_t **ubus_object, const char *name, const char *yang_module);
+//int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, void (*f)());
+int ubus_object_unsubscribe(sr_session_ctx_t *session, ubus_object_t *ubus_object);
+int ubus_object_add_method(ubus_object_t *ubus_object, ubus_method_t *ubus_method);
+int ubus_object_delete_method(ubus_object_t *ubus_object, const char *method_name);
+int ubus_object_delete_all_methods(ubus_object_t *ubus_object);
+int ubus_object_get_name(ubus_object_t *ubus_object, char *name);
+int ubus_object_get_yang_module(ubus_object_t *ubus_object, char *yang_module);
+int ubus_object_get_method(ubus_object_t *ubus_object, ubus_method_t *ubus_method, const char *method_name);
+void ubus_object_destroy(ubus_object_t **ubus_object);
+
 
 #endif // _UBUS_OBJECT_H_
