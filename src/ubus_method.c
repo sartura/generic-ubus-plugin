@@ -1,38 +1,54 @@
 #include "ubus_method.h"
 #include "common.h"
 
-int ubus_method_create(ubus_method_t **ubus_method, const char *name, const char *message)
+int ubus_method_create(ubus_method_t **ubus_method)
 {
     int rc = 0;
-    char *name_local = NULL;
-    char *message_local = NULL;
-
-    CHECK_NULL_MSG(name, &rc, cleanup, "input argument name is null");
-    CHECK_NULL_MSG(message, &rc, cleanup, "input argument message is null");
 
     *ubus_method = calloc(1, sizeof(ubus_method_t));
     CHECK_NULL_MSG(*ubus_method, &rc, cleanup, "return argument ubus_method is null");
 
-    name_local = calloc(strlen(name), sizeof(char));
-    CHECK_NULL_MSG(name_local, &rc, cleanup, "memory allocation for name failed");
-    message_local = calloc(strlen(message), sizeof(char));
-    CHECK_NULL_MSG(message_local, &rc, cleanup, "memory allocation for yang_module failed");
-
-    strncpy(name_local, name, strlen(name_local));
-    strncpy(message_local, message, strlen(message_local));
-
-    (*ubus_method)->name = name_local;
-    (*ubus_method)->message = message_local;
+    (*ubus_method)->name = NULL;
+    (*ubus_method)->message = NULL;
 
     return rc;
 
 cleanup:
-    free(name_local);
-    free(message_local);
     free(ubus_method);
     return rc;
 }
 
+int ubus_method_set_name(ubus_method_t *ubus_method, const char *name)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
+    CHECK_NULL_MSG(name, &rc, cleanup, "input argument name is null");
+
+    char *name_local = calloc(strlen(name), sizeof(char));
+    CHECK_NULL_MSG(name_local, &rc, cleanup, "memory allocation for name failed");
+
+    if (ubus_method->name != NULL) free(ubus_method->name);
+    ubus_method->name = name_local;
+
+cleanup:
+    return rc;
+}
+
+int ubus_method_set_message(ubus_method_t *ubus_method, const char *message)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
+    CHECK_NULL_MSG(message, &rc, cleanup, "input argument message is null");
+
+    char *message_local = calloc(strlen(message), sizeof(char));
+    CHECK_NULL_MSG(message_local, &rc, cleanup, "memory allocation for message failed");
+
+    if (ubus_method->message != NULL) free(ubus_method->message);
+    ubus_method->message = message_local;
+
+cleanup:
+    return rc;
+}
 
 int ubus_method_get_name(ubus_method_t *ubus_method, char **name)
 {

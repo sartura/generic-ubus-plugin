@@ -155,6 +155,7 @@ int context_delete_ubus_object(context_t *context, const char *ubus_object_name)
     CHECK_RET(rc, cleanup, "ubus method %s not found", ubus_object_name);
 
     list_del(&ubus_object->list);
+    // TODO: unsubscribe
     ubus_object_destroy(&ubus_object);
 
 cleanup:

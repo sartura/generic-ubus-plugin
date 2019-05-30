@@ -5,8 +5,6 @@
 int ubus_object_create(ubus_object_t **ubus_object)
 {
     int rc = 0;
-    char *name_local = NULL;
-    char *yang_module_local = NULL;
 
     *ubus_object = calloc(1, sizeof(ubus_object_t));
     CHECK_NULL_MSG(*ubus_object, &rc, cleanup, "return argument ubus_object is null");
@@ -19,8 +17,6 @@ int ubus_object_create(ubus_object_t **ubus_object)
     return rc;
 
 cleanup:
-    free(name_local);
-    free(yang_module_local);
     free(ubus_object);
     return rc;
 }
