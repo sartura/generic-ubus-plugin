@@ -174,7 +174,7 @@ static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value)
     CHECK_RET_MSG(rc, cleanup, "allocation attr is null");
 
     ubus_object_t *ubus_object = NULL;
-    rc = context_get_ubus_object(context, ubus_object, attr);
+    rc = context_get_ubus_object(context, &ubus_object, attr);
     CHECK_RET_MSG(rc, cleanup, "get ubus object error");
 
     char *leaf = NULL;

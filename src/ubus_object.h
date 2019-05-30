@@ -31,9 +31,9 @@ int ubus_object_unsubscribe(sr_session_ctx_t *session, ubus_object_t *ubus_objec
 int ubus_object_add_method(ubus_object_t *ubus_object, ubus_method_t *ubus_method);
 int ubus_object_delete_method(ubus_object_t *ubus_object, const char *method_name);
 int ubus_object_delete_all_methods(ubus_object_t *ubus_object);
-int ubus_object_get_name(ubus_object_t *ubus_object, char *name);
-int ubus_object_get_yang_module(ubus_object_t *ubus_object, char *yang_module);
-int ubus_object_get_method(ubus_object_t *ubus_object, ubus_method_t *ubus_method, const char *method_name);
+int ubus_object_get_name(ubus_object_t *ubus_object, char **name);
+int ubus_object_get_yang_module(ubus_object_t *ubus_object, char **yang_module);
+int ubus_object_get_method(ubus_object_t *ubus_object, ubus_method_t **ubus_method, const char *method_name);
 void ubus_object_destroy(ubus_object_t **ubus_object);
 
 

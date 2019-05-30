@@ -16,8 +16,8 @@ struct ubus_method_s {
 typedef struct ubus_method_s ubus_method_t;
 
 int ubus_method_create(ubus_method_t **ubus_method, const char *name, const char *message);
-int ubus_method_get_name(ubus_method_t *ubus_method, char *name);
-int ubus_method_get_message(ubus_method_t *ubus_method, char *message);
+int ubus_method_get_name(ubus_method_t *ubus_method, char **name);
+int ubus_method_get_message(ubus_method_t *ubus_method, char **message);
 void ubus_method_destroy(ubus_method_t **ubus_method);
 
 #endif //_UBUS_METHOD_H_

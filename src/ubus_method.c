@@ -34,25 +34,25 @@ cleanup:
 }
 
 
-int ubus_method_get_name(ubus_method_t *ubus_method, char *name)
+int ubus_method_get_name(ubus_method_t *ubus_method, char **name)
 {
     int rc = 0;
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
     CHECK_NULL_MSG(ubus_method->name, &rc, cleanup, "ubus_metehod name is null");
 
-    name = ubus_method->name;
+    *name = ubus_method->name;
 
 cleanup:
     return rc;
 }
 
-int ubus_method_get_message(ubus_method_t *ubus_method, char *message)
+int ubus_method_get_message(ubus_method_t *ubus_method, char **message)
 {
     int rc = 0;
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
     CHECK_NULL_MSG(ubus_method->message, &rc, cleanup, "ubus_metehod name is null");
 
-    message = ubus_method->message;
+    *message = ubus_method->message;
 
 cleanup:
     return rc;

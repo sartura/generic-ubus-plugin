@@ -52,7 +52,7 @@ cleanup:
   return rc;
 }
 
-int context_set_startup_connection(context_t *context, sr_conn_ctx_t* connection)
+int context_set_startup_connection(context_t *context, sr_conn_ctx_t *connection)
 {
     int rc = 0;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
@@ -64,53 +64,53 @@ cleanup:
     return rc;
 }
 
-int context_get_session(context_t *context, sr_session_ctx_t *session)
+int context_get_session(context_t *context, sr_session_ctx_t **session)
 {
     int rc = 0;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(context->session, &rc, cleanup, "context session is null");
 
-    session = context->session;
+    *session = context->session;
 
 cleanup:
     return rc;
 }
 
-int context_get_subscription(context_t *context, sr_subscription_ctx_t *subscription)
+int context_get_subscription(context_t *context, sr_subscription_ctx_t **subscription)
 {
     int rc = 0;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(context->subscription, &rc, cleanup, "context subscription is null");
 
-    subscription = context->subscription;
+    *subscription = context->subscription;
 
 cleanup:
     return rc;
 }
-int context_get_startup_session(context_t *context, sr_session_ctx_t *session)
+int context_get_startup_session(context_t *context, sr_session_ctx_t **session)
 {
     int rc = 0;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(context->startup_session, &rc, cleanup, "context startup_session is null");
 
-    session = context->startup_session;
+    *session = context->startup_session;
 
 cleanup:
   return rc;
 }
-int context_get_startup_connection(context_t *context, sr_conn_ctx_t* connection)
+int context_get_startup_connection(context_t *context, sr_conn_ctx_t **connection)
 {
     int rc = 0;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(context->startup_connection, &rc, cleanup, "context connection is null");
 
-    connection = context->startup_connection;
+    *connection = context->startup_connection;
 
 cleanup:
     return rc;
 }
 
-int context_get_ubus_object(context_t *context, ubus_object_t *ubus_object, const char *ubus_object_name)
+int context_get_ubus_object(context_t *context, ubus_object_t **ubus_object, const char *ubus_object_name)
 {
     int rc = 0;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
@@ -121,7 +121,7 @@ int context_get_ubus_object(context_t *context, ubus_object_t *ubus_object, cons
     {
         if (strncmp(ubus_object_local->name, ubus_object_name, strlen(ubus_object_local->name)) == 0)
         {
-            ubus_object = ubus_object_local;
+            *ubus_object = ubus_object_local;
             return rc;
         }
     }
@@ -151,10 +151,9 @@ int context_delete_ubus_object(context_t *context, const char *ubus_object_name)
     CHECK_NULL_MSG(ubus_object_name, &rc, cleanup, "input argument ubus_object_name is null");
 
     ubus_object_t *ubus_object = NULL;
-    rc = context_get_ubus_object(context, ubus_object, ubus_object_name);
+    rc = context_get_ubus_object(context, &ubus_object, ubus_object_name);
     CHECK_RET(rc, cleanup, "ubus method %s not found", ubus_object_name);
 
-    // TODO: fix this segmentation fault
     list_del(&ubus_object->list);
     ubus_object_destroy(&ubus_object);
 
