@@ -21,32 +21,44 @@ cleanup:
 int ubus_method_set_name(ubus_method_t *ubus_method, const char *name)
 {
     int rc = SR_ERR_OK;
+    char *name_local = NULL;
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
     CHECK_NULL_MSG(name, &rc, cleanup, "input argument name is null");
 
-    char *name_local = calloc(strlen(name), sizeof(char));
+    name_local = calloc(strlen(name)+1, sizeof(char));
     CHECK_NULL_MSG(name_local, &rc, cleanup, "memory allocation for name failed");
+
+    strncpy(name_local, name, strlen(name));
 
     if (ubus_method->name != NULL) free(ubus_method->name);
     ubus_method->name = name_local;
 
+    return rc;
+
 cleanup:
+    free(name_local);
     return rc;
 }
 
 int ubus_method_set_message(ubus_method_t *ubus_method, const char *message)
 {
     int rc = SR_ERR_OK;
+    char *message_local = NULL;
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
     CHECK_NULL_MSG(message, &rc, cleanup, "input argument message is null");
 
-    char *message_local = calloc(strlen(message), sizeof(char));
+    message_local = calloc(strlen(message)+1, sizeof(char));
     CHECK_NULL_MSG(message_local, &rc, cleanup, "memory allocation for message failed");
+
+    strncpy(message_local, message, strlen(message));
 
     if (ubus_method->message != NULL) free(ubus_method->message);
     ubus_method->message = message_local;
 
+    return rc;
+
 cleanup:
+    free(message_local);
     return rc;
 }
 

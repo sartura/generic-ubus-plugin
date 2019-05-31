@@ -62,7 +62,7 @@ int xpath_get_tail_node(const char *xpath, char **node)
 
     char *name = calloc(1, sizeof(char)*len + 1);
     CHECK_NULL_MSG(name, &rc, cleanup, "allocation for name error");
-    strncpy(name, nth_ptr, len);
+    strncpy(name, nth_ptr+1, len);
     name[len] = '\0';
 
     *node = name;
@@ -106,5 +106,29 @@ int xpath_get_node_key_value(char *xpath, const char *node_name, const char *key
     *key_value = value;
 cleanup:
     sr_xpath_recover(&ctx);
+    return rc;
+}
+
+int xpath_get_module_name(const char *xpath, char **module_name)
+{
+    int rc = SR_ERR_OK;
+    *module_name = NULL;
+    CHECK_NULL_MSG(xpath, &rc, cleanup, "input argument xpath is null");
+
+    char *nth_ptr = strchr(xpath, ':');
+    CHECK_NULL_MSG(nth_ptr, &rc, cleanup, "':' not found");
+
+    int len = (int)(nth_ptr - xpath - 1);
+
+    char *module = calloc(1, sizeof(char)*len + 1);
+    CHECK_NULL_MSG(module, &rc, cleanup, "allocation for module error");
+    strncpy(module, xpath+1, len);
+    module[len] = '\0';
+
+    *module_name = module;
+
+    INF("%s", *module_name);
+
+cleanup:
     return rc;
 }

@@ -1,6 +1,8 @@
 #include "sysrepo.h"
 
 #include "ubus_object.h"
+#include "libyang/libyang.h"
+#include "libyang/tree_schema.h"
 
 int ubus_object_create(ubus_object_t **ubus_object)
 {
@@ -11,6 +13,7 @@ int ubus_object_create(ubus_object_t **ubus_object)
 
     (*ubus_object)->name = NULL;
     (*ubus_object)->yang_module = NULL;
+    (*ubus_object)->state_data_subscription = NULL;
 
     INIT_LIST_HEAD(&((*ubus_object)->ubus_method_list));
 
@@ -24,41 +27,60 @@ cleanup:
 int ubus_object_set_name(ubus_object_t *ubus_object, const char *name)
 {
     int rc = 0;
+    char *name_local = NULL;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(name, &rc, cleanup, "input argument name is null");
 
-    char *name_local = calloc(strlen(name), sizeof(char));
+    name_local = calloc(strlen(name)+1, sizeof(char));
     CHECK_NULL_MSG(name_local, &rc, cleanup, "memory allocation for name failed");
+
+    strncpy(name_local, name, strlen(name));
 
     if (ubus_object->name != NULL) free(ubus_object->name);
     ubus_object->name = name_local;
 
+    return rc;
+
 cleanup:
+    free(name_local);
     return rc;
 }
 
 int ubus_object_set_yang_module(ubus_object_t *ubus_object, const char *yang_module)
 {
     int rc = 0;
+    char *yang_module_local = NULL;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(yang_module, &rc, cleanup, "input argument yang_module is null");
 
-    char *yang_module_local = calloc(strlen(yang_module), sizeof(char));
+    yang_module_local = calloc(strlen(yang_module)+1, sizeof(char));
     CHECK_NULL_MSG(yang_module_local, &rc, cleanup, "memory allocation for yang_module failed");
+
+    strncpy(yang_module_local, yang_module, strlen(yang_module));
 
     if (ubus_object->yang_module != NULL) free(ubus_object->yang_module);
     ubus_object->yang_module = yang_module_local;
 
+    return rc;
+
 cleanup:
+    free(yang_module_local);
     return rc;
 }
 
-/*
-int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, void (*f)())
+
+int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, int (*f)(const char *, sr_val_t **, size_t *, uint64_t, const char *, void *))
 {
-    int rc = 0;
-    char *xpath = "/example:state-data"; // will be set with helper function
-    // checko input if null
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(private_ctx, &rc, cleanup, "input argument private_ctx is null");
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(session, &rc, cleanup, "input argument session is null");
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(f, &rc, cleanup, "input argument f is null");
+
+    char xpath[256 + 1] = {0};
+    snprintf(xpath, strlen(ubus_object->yang_module) + 13, "/%s:state-data", ubus_object->yang_module);
+
     INF_MSG("Subscribing to operational");
 	rc = sr_dp_get_items_subscribe(session,
 								   xpath,
@@ -66,14 +88,11 @@ int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_obj
 								   private_ctx,
 								   SR_SUBSCR_CTX_REUSE,
 								   &ubus_object->state_data_subscription);
-
-	if ( rc != SR_ERR_OK)
-    {
-        ERR("%s: %s", __func__, sr_strerror(rc));
-    }
+    CHECK_RET(rc, cleanup, "dp subscription: %s", sr_strerror(rc));
+cleanup:
     return rc;
 }
-*/
+
 int ubus_object_add_method(ubus_object_t *ubus_object, ubus_method_t *ubus_method)
 {
     int rc = 0;
@@ -169,15 +188,43 @@ int ubus_object_unsubscribe(sr_session_ctx_t *session, ubus_object_t *ubus_objec
 {
     int rc = 0;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
-    CHECK_NULL_MSG(ubus_object->state_data_subscription, &rc, cleanup, "state_data_subscription is null");
+    //CHECK_NULL_MSG(ubus_object->state_data_subscription, &rc, cleanup, "state_data_subscription is null");
     CHECK_NULL_MSG(session, &rc, cleanup, "input argument session is null");
 
-    rc = sr_unsubscribe(session, ubus_object->state_data_subscription);
-    SR_CHECK_RET(rc, cleanup, "sr_unsubscribe: %s", sr_strerror(rc));
+    if (ubus_object->state_data_subscription != NULL)
+    {
+        INF_MSG("Unsubscribing from operational");
+        rc = sr_unsubscribe(session, ubus_object->state_data_subscription);
+        SR_CHECK_RET(rc, cleanup, "sr_unsubscribe: %s", sr_strerror(rc));
+
+        ubus_object->state_data_subscription = NULL;
+    }
 
 cleanup:
     return rc;
 }
+
+int ubus_object_schema_init(ubus_object_t *ubus_object, sr_session_ctx_t * session)
+{
+    int rc = SR_ERR_OK;
+    char *yang_schema = NULL;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input ubus_object is null");
+    CHECK_NULL_MSG(session, &rc, cleanup, "input session is null");
+
+    rc = sr_get_schema(session, ubus_object->yang_module, NULL, NULL, SR_SCHEMA_YANG, &yang_schema);
+    SR_CHECK_RET(rc, cleanup, "get schema error: %s", sr_strerror(rc));
+
+    if (ubus_object->ly_ctx != NULL) { ly_ctx_destroy(ubus_object->ly_ctx); }
+    // create ly new context
+    ubus_object->lys_module = NULL;
+
+cleanup:
+    free(yang_schema);
+    return rc;
+}
+
+int ubus_object_schema_clean()
+{}
 
 void ubus_object_destroy(ubus_object_t **ubus_object)
 {

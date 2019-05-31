@@ -8,83 +8,6 @@
 #include "generic_ubus.h"
 #include "common.h"
 
-// // TODO: move context related functions to new file
-// void free_ubus_object(struct ubus_object_s *obj, sr_session_ctx_t *session)
-// {
-// 	INF("%s", __func__);
-// 	if (NULL == obj) return;
-// 	free(obj->name);
-// 	free(obj->yang_module);
-
-// 	struct ubus_message_s *msg_p = NULL;
-// 	struct ubus_message_s *msg_n = NULL;
-// 	list_for_each_entry_safe(msg_p, msg_n, &obj->ubus_object_method_list,
-// 							 method_list)
-// 	{
-// 		list_del(&msg_p->method_list);
-// 		free(msg_p->method_name);
-// 		free(msg_p->method_message);
-// 		free(msg_p);
-// 	}
-
-// 	if (NULL != session && NULL != obj->sd_subscription)
-// 	{
-// 		sr_unsubscribe(session, obj->sd_subscription);
-// 	}
-// 	free(obj);
-// }
-
-// void free_global_ctx(struct global_ctx_s **ctx)
-// {
-// 	if (NULL != (*ctx)->session && NULL != (*ctx)->subscription)
-// 	{
-// 		sr_unsubscribe((*ctx)->session, (*ctx)->subscription);
-// 		(*ctx)->subscription = NULL;
-// 	}
-
-// 	ubus_object_t *obj_p = NULL;
-// 	ubus_object_t *obj_n = NULL;
-// 	list_for_each_entry_safe(obj_p, obj_n, &(*ctx)->uo_list, object_list)
-// 	{
-// 		list_del(&obj_p->list);
-// 		free_ubus_object(obj_p, (*ctx)->session);
-// 		obj_p = NULL;
-// 	}
-
-// 	/* clean startup datastore */
-//     if (NULL != (*ctx)->session_startup) {
-//         sr_session_stop((*ctx)->session_startup);
-//     }
-//     if (NULL != (*ctx)->connection_startup) {
-//         sr_disconnect((*ctx)->connection_startup);
-// 	}
-
-// 	free(*ctx);
-// 	*ctx = NULL;
-// }
-
-// int init_global_ctx(struct global_ctx_s *ctx, sr_session_ctx_t *session)
-// {
-// 	int rc = SR_ERR_OK;
-// 	if (NULL == ctx)
-// 	{
-// 		return -1;
-// 	}
-
-// 	ctx->session = session;
-// 	INIT_LIST_HEAD(&ctx->uo_list);
-
-// 	 /* connect to sysrepo */
-//     rc = sr_connect(YANG_MODEL, SR_CONN_DEFAULT, &ctx->connection_startup);
-//     CHECK_RET(rc, cleanup, "Error by sr_connect: %s", sr_strerror(rc));
-
-//     /* start session */
-//     rc = sr_session_start(ctx->connection_startup, SR_DS_STARTUP, SR_SESS_CONFIG_ONLY, &ctx->session_startup);
-// 	CHECK_RET(rc, cleanup, "Error by sr_session_start: %s", sr_strerror(rc));
-
-// cleanup:
-// 	return rc;
-// }
 
 static int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name, sr_notif_event_t event, void *private_ctx)
 {
@@ -160,6 +83,10 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
 	SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
 
 	rc = context_set_startup_session(context, startup_session);
+	SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
+
+	// load startup datastore
+	rc = generic_ubus_load_startup_datastore(context);
 	SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
 
 	INF_MSG("Subcribing to module change");

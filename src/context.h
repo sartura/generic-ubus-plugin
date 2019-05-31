@@ -18,6 +18,9 @@ struct context_s {
 
 typedef struct context_s context_t;
 
+#define context_for_each_ubus_object(__ctx, __uo)	\
+list_for_each_entry(__uo, &__ctx->ubus_object_list, list)
+
 int context_create(context_t **context);
 int context_set_session(context_t *context, sr_session_ctx_t *session);
 int context_set_subscription(context_t *context, sr_subscription_ctx_t *subscription);

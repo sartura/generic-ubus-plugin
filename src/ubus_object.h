@@ -20,11 +20,11 @@ struct ubus_object_s {
 
 typedef struct ubus_object_s ubus_object_t;
 
-// TODO: refresh using .c definitions
+#define ubus_object_for_each_ubus_method(__uo, __uom)	\
+list_for_each_entry(__uom, &__uo->ubus_method_list, list)
 
-//int ubus_object_create(ubus_object_t **ubus_object, const char *name, const char *yang_module);
-//int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, void (*f)());
 int ubus_object_create(ubus_object_t **ubus_object);
+int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, int (*f)(const char *, sr_val_t **, size_t *, uint64_t, const char *, void *));
 int ubus_object_set_name(ubus_object_t *ubus_object, const char *name);
 int ubus_object_set_yang_module(ubus_object_t *ubus_object, const char *yang_module);
 int ubus_object_unsubscribe(sr_session_ctx_t *session, ubus_object_t *ubus_object);
