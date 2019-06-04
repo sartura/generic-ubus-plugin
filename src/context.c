@@ -157,7 +157,8 @@ int context_delete_ubus_object(context_t *context, const char *ubus_object_name)
     list_del(&ubus_object->list);
 
     rc = ubus_object_unsubscribe(context->session, ubus_object);
-    // check rc
+    CHECK_RET_MSG(rc, cleanup, "context unsubscribe ubus object error");
+
     ubus_object_destroy(&ubus_object);
 
 cleanup:

@@ -3,6 +3,9 @@
 
 #include <libubox/list.h>
 
+#include "libyang/libyang.h"
+#include "libyang/tree_schema.h"
+
 #include "common.h"
 #include "ubus_method.h"
 
@@ -10,8 +13,13 @@
 struct ubus_object_s {
 	char *name;
 	char *yang_module;
+	char *json_data;
 
 	sr_subscription_ctx_t *state_data_subscription;
+
+	// libyang structures
+	struct ly_ctx *libyang_ctx;
+	struct lys_module *libyang_module;
 
 	//list structure
 	struct list_head ubus_method_list;
@@ -35,6 +43,10 @@ int ubus_object_get_name(ubus_object_t *ubus_object, char **name);
 int ubus_object_get_yang_module(ubus_object_t *ubus_object, char **yang_module);
 int ubus_object_get_method(ubus_object_t *ubus_object, ubus_method_t **ubus_method, const char *method_name);
 void ubus_object_destroy(ubus_object_t **ubus_object);
-
+int ubus_object_init_libyang_data(ubus_object_t *ubus_object, sr_session_ctx_t *session);
+int ubus_object_get_libyang_schema(ubus_object_t *ubus_object ,struct lys_module **module);
+int ubus_object_clean_libyang_data(ubus_object_t *ubus_object);
+int ubus_object_get_json_data(ubus_object_t *ubus_object, char **json_data);
+int ubus_object_set_json_data(ubus_object_t *ubus_object, char *json_data);
 
 #endif // _UBUS_OBJECT_H_

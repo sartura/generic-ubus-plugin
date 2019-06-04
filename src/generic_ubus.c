@@ -6,6 +6,8 @@
 #include "xpath.h"
 #include "sysrepo/values.h"
 
+#include "libyang/tree_data.h"
+
 #define YANG_UBUS_OBJECT "ubus-object"
 #define YANG_UBUS_METHOD "method"
 
@@ -29,6 +31,7 @@ static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value);
 static int generic_ubus_set_context(context_t *context, sr_val_t *value);
 static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, const char *original_xpath, void *private_ctx);
 static void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg);
+static void generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node);
 
 int generic_ubus_load_startup_datastore(context_t *context)
 {
@@ -236,6 +239,9 @@ static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value)
 
         rc = ubus_object_subscribe(context->session, (void *)context, ubus_object, generic_ubus_operational_cb);
         CHECK_RET_MSG(rc, cleanup, "subscribe error");
+
+        rc = ubus_object_init_libyang_data(ubus_object, context->session);
+        CHECK_RET_MSG(rc, cleanup, "init libyang context error");
     }
     // name attribute is already set when createing ubus object
     // because the name is the key for the ubus object list in YANG module
@@ -459,19 +465,22 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
     struct ubus_context *ubus_ctx = NULL;
     unsigned int ubus_id = 0;
     char *module_name = NULL;
+    char *method_name = NULL;
     struct blob_buf buf = {0};
+    json_object *parsed_json = NULL;
+    const char *state_data_node_string = "state-data";
+
+    struct lyd_node *root = NULL;
+    struct lyd_node *parent = NULL;
+    static struct lys_module *libyang_module = NULL;
     CHECK_NULL_MSG(cb_xpath, &rc, cleanup, "input argument cb_xpath is null");
     CHECK_NULL_MSG(values_cnt, &rc, cleanup, "input argument values_cnt is null");
     CHECK_NULL_MSG(original_xpath, &rc, cleanup, "input argument original_xpath is null");
     CHECK_NULL_MSG(private_ctx, &rc, cleanup, "input argument private_ctx is null");
 
-    // also in if below
-    // get the module mane from original_xpath
-    // find the ubus object from list that matches the xpath one
-    // create ubus call context
-    // call ubus method with ubus object as priv data
-    // NOTE: ubus object holds the libyang necessary data
-    // static variable for ubus response
+
+    *values_cnt = 0;
+
     if (request_id != request)
     {
         request = request_id;
@@ -484,36 +493,106 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
         ubus_object_t *ubus_object_it = NULL;
         context_for_each_ubus_object(context, ubus_object_it)
         {
-            INF("uo_name: %s | uo_yang_module: %s", ubus_object_it->name, ubus_object_it->yang_module);
-            ubus_object = ubus_object_it;
-        }
 
-        // make ubus calls for all methods
+            // compare the requested yang module  and ubus object yang module
+            char *yang_module = NULL;
+            rc = ubus_object_get_yang_module(ubus_object_it, &yang_module);
+            CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
+            if (strncmp(yang_module, module_name, strlen(yang_module)) == 0)
+            {
+                ubus_object = ubus_object_it;
+                break;
+            }
+        }
+        // TODO: load sr schema and module
+        rc = ubus_object_get_libyang_schema(ubus_object, &libyang_module);
+        CHECK_RET_MSG(rc, cleanup, "get libyang module schema error");
+
+        root = lyd_new(NULL, libyang_module, state_data_node_string);
+        CHECK_NULL_MSG(root, &rc, cleanup, "libyang data root node");
+
+    }
+    else
+    {
+
+        root = lyd_new(NULL, libyang_module, state_data_node_string);
+        CHECK_NULL_MSG(root, &rc, cleanup, "libyang data root node");
+
+        // get the leaf , state data container is required to exists
+        rc = xpath_get_tail_node(cb_xpath, &method_name);
+        CHECK_RET_MSG(rc, cleanup, "xpath get tail node error");
+
+        INF("%s", method_name);
+
         ubus_method_t *ubus_method_it = NULL;
+        ubus_method_t *ubus_method = NULL;
         ubus_object_for_each_ubus_method(ubus_object, ubus_method_it)
         {
             INF("uom_name: %s | uom_message: %s", ubus_method_it->name, ubus_method_it->message);
 
-            ubus_ctx = ubus_connect(NULL);
-            CHECK_NULL_MSG(ubus_ctx, &rc, cleanup, "ubus context is null");
+            char *ubus_method_name = NULL;
+            rc = ubus_method_get_name(ubus_method_it, &ubus_method_name);
+            CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
 
-            urc = ubus_lookup_id(ubus_ctx, ubus_object->name, &ubus_id);
-            UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus lookup id error");
-
-            blob_buf_init(&buf, 0);
-            blobmsg_add_json_from_string(&buf, ubus_method_it->message);
-
-            urc = ubus_invoke(ubus_ctx, ubus_id, ubus_method_it->name, buf.head, ubus_get_response_cb, context, 1000);
-            UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus invoke error");
-
-            blob_buf_free(&buf);
-
+            if (strncmp(ubus_method_name, method_name, strlen(ubus_method_name)) == 0)
+            {
+                ubus_method = ubus_method_it;
+                break;
+            }
         }
-    }
 
-    INF("original xpath: %s", original_xpath);
+        ubus_ctx = ubus_connect(NULL);
+        CHECK_NULL_MSG(ubus_ctx, &rc, cleanup, "ubus context is null");
+
+        urc = ubus_lookup_id(ubus_ctx, ubus_object->name, &ubus_id);
+        UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus lookup id error");
+
+        blob_buf_init(&buf, 0);
+        blobmsg_add_json_from_string(&buf, ubus_method->message);
+
+        urc = ubus_invoke(ubus_ctx, ubus_id, ubus_method->name, buf.head, ubus_get_response_cb, ubus_object, 1000);
+        UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus invoke error");
+
+        blob_buf_free(&buf);
+
+        INF("ubus-object :%s\nubus-method: %s\nresult: %s", ubus_object->name, ubus_method->name, ubus_object->json_data);
+
+        char *json_data = NULL;
+        rc = ubus_object_get_json_data(ubus_object, &json_data);
+        CHECK_RET_MSG(rc, cleanup, "ubus object get json data");
+
+        parsed_json = json_tokener_parse(json_data);
+        CHECK_NULL_MSG(parsed_json, &rc, cleanup, "tokener parser error");
+
+        // todo generic ubus yang add top container -> name of ubus object
+
+        parent = lyd_new(root, libyang_module, ubus_method->name);
+        CHECK_NULL_MSG(parent, &rc, cleanup, "libyang data root is null");
+
+        // pass parent node and fill data
+        generic_ubus_walk_json(parsed_json, libyang_module, parent);
+
+        // validate the libyang
+        if (lyd_validate(&root, LYD_OPT_DATA, NULL) != 0)
+        {
+            ERR_MSG("error while validating libyang data tree");
+            goto cleanup;
+        }
+
+        // print parent
+        char *lprint = NULL;
+        lyd_print_mem(&lprint, root, LYD_XML, LYP_WITHSIBLINGS);
+        INF("%s", lprint);
+        free(lprint);
+
+        // TODO: set the sr_val_t object from libyang
+/*
+        INF("uo_name: %s | uo_yang_module: %s", ubus_object->name, ubus_object->yang_module);
+        INF("original xpath: %s", original_xpath);
+        INF("callback xpath: %s", cb_xpath);
+*/
+    }
     INF("callback xpath: %s", cb_xpath);
-    *values_cnt = 0;
 
 cleanup:
     // ubus object and msg blob clean up
@@ -522,8 +601,13 @@ cleanup:
 	}
 
     free(module_name);
+    free(method_name);
+
+    if (parsed_json != NULL) { json_object_put(parsed_json); }
 
     blob_buf_free(&buf);
+
+    if (root != NULL) { lyd_free_withsiblings(root); }
 
     return rc;
 }
@@ -536,11 +620,55 @@ static void ubus_get_response_cb(struct ubus_request *req, int type, struct blob
 	}
 
     int rc = SR_ERR_OK;
-	context_t *context = req->priv;
-    CHECK_NULL_MSG(context, &rc, cleanup, "req private data is null");
-	char *result_str = blobmsg_format_json(msg, true);
-    INF("%s", result_str);
+	ubus_object_t *ubus_object = req->priv;
+    //json_object *result_json = NULL;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "req private data is null");
+
+    char *result_str = blobmsg_format_json(msg, true);
+    CHECK_NULL_MSG(result_str, &rc, cleanup, "json data is null");
+
+    rc = ubus_object_set_json_data(ubus_object, result_str);
+    CHECK_RET_MSG(rc, cleanup, "ubus object set json data error");
 
 cleanup:
-    free(result_str);
+    return;
+}
+
+// TODO: encorporate libyang schema and data for storing
+static void generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node)
+{
+    struct lyd_node *new_node = NULL;
+    int rc = SR_ERR_OK;
+    json_object_object_foreach(object, key, value)
+	{
+        json_type type = json_object_get_type(value);
+        if ( type == json_type_object)
+        {
+            // create new container node
+            new_node = lyd_new(node, module, key);
+            CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
+            generic_ubus_walk_json(value, module, new_node);
+        }
+        else if (type == json_type_array)
+        {
+            // create new list node
+            new_node = lyd_new(node, module, key);
+            CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
+            size_t json_array_length = json_object_array_length(value);
+            for (size_t i = 0; i < json_array_length; i++)
+            {
+                json_object *entry = json_object_array_get_idx(value, i);
+                generic_ubus_walk_json(entry, module, new_node);
+            }
+        }
+        else
+        {
+            INF("%s: %s", key, json_object_get_string(value));
+            new_node = lyd_new_leaf(node, module, key, json_object_get_string(value));
+            CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new leaf error");
+        }
+    }
+cleanup:
+    if (new_node != NULL) { lyd_free_withsiblings(new_node); }
+    return;
 }

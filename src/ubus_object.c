@@ -1,8 +1,6 @@
 #include "sysrepo.h"
 
 #include "ubus_object.h"
-#include "libyang/libyang.h"
-#include "libyang/tree_schema.h"
 
 int ubus_object_create(ubus_object_t **ubus_object)
 {
@@ -14,6 +12,10 @@ int ubus_object_create(ubus_object_t **ubus_object)
     (*ubus_object)->name = NULL;
     (*ubus_object)->yang_module = NULL;
     (*ubus_object)->state_data_subscription = NULL;
+
+    (*ubus_object)->libyang_ctx = NULL;
+    (*ubus_object)->libyang_module = NULL;
+    (*ubus_object)->json_data = NULL;
 
     INIT_LIST_HEAD(&((*ubus_object)->ubus_method_list));
 
@@ -204,27 +206,87 @@ cleanup:
     return rc;
 }
 
-int ubus_object_schema_init(ubus_object_t *ubus_object, sr_session_ctx_t * session)
+int ubus_object_init_libyang_data(ubus_object_t *ubus_object, sr_session_ctx_t *session)
 {
     int rc = SR_ERR_OK;
-    char *yang_schema = NULL;
+    struct ly_ctx *libyang_ctx = NULL;
+    struct lys_module *libyang_module = NULL;
+    char *sysrepo_schema = NULL;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input ubus_object is null");
     CHECK_NULL_MSG(session, &rc, cleanup, "input session is null");
 
-    rc = sr_get_schema(session, ubus_object->yang_module, NULL, NULL, SR_SCHEMA_YANG, &yang_schema);
-    SR_CHECK_RET(rc, cleanup, "get schema error: %s", sr_strerror(rc));
+    if (ubus_object->libyang_ctx != NULL) { ly_ctx_destroy(ubus_object->libyang_ctx, NULL); }
+    // TODO : ly_ctx and module here
+    ubus_object->libyang_ctx = NULL;
+    libyang_ctx = ly_ctx_new(NULL, LY_CTX_ALLIMPLEMENTED );
+    CHECK_NULL_MSG(libyang_ctx, &rc, cleanup, "libyang_ctx is null");
 
-    if (ubus_object->ly_ctx != NULL) { ly_ctx_destroy(ubus_object->ly_ctx); }
-    // create ly new context
-    ubus_object->lys_module = NULL;
+
+    rc = sr_get_schema(session, ubus_object->yang_module, NULL, NULL, SR_SCHEMA_YANG, &sysrepo_schema);
+    CHECK_RET_MSG(rc, cleanup, "get schema from sysrepo error");
+
+    libyang_module = (struct lys_module *) lys_parse_mem(libyang_ctx, sysrepo_schema, LYS_IN_YANG);
+    CHECK_NULL_MSG(libyang_module, &rc, cleanup, "ly module  is null");
+
+    ubus_object->libyang_ctx = libyang_ctx;
+    ubus_object->libyang_module = libyang_module;
 
 cleanup:
-    free(yang_schema);
+
+    free(sysrepo_schema);
+
     return rc;
 }
 
-int ubus_object_schema_clean()
-{}
+int ubus_object_get_libyang_schema(ubus_object_t *ubus_object ,struct lys_module **module)
+{
+    int rc = 0;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(ubus_object->libyang_ctx, &rc, cleanup, "ubus_object libyang_ctx is null");
+
+
+    *module = ubus_object->libyang_module;
+
+cleanup:
+    return rc;
+}
+
+int ubus_object_clean_libyang_data(ubus_object_t *ubus_object)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input ubus_object is null");
+
+    ly_ctx_destroy(ubus_object->libyang_ctx, NULL);
+
+cleanup:
+    return rc;
+}
+
+int ubus_object_get_json_data(ubus_object_t *ubus_object, char **json_data)
+{
+    int rc = 0;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(ubus_object->json_data, &rc, cleanup, "ubus_object json_data is null");
+
+
+    *json_data = ubus_object->json_data;
+
+cleanup:
+    return rc;
+}
+
+int ubus_object_set_json_data(ubus_object_t *ubus_object, char *json_data)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(json_data, &rc, cleanup, "input json_data is null");
+
+    if (ubus_object->json_data != NULL) { free(ubus_object->json_data); }
+    ubus_object->json_data = json_data;
+
+cleanup:
+    return rc;
+}
 
 void ubus_object_destroy(ubus_object_t **ubus_object)
 {
@@ -232,7 +294,11 @@ void ubus_object_destroy(ubus_object_t **ubus_object)
     {
         free((*ubus_object)->name);
         free((*ubus_object)->yang_module);
-        int rc = ubus_object_delete_all_methods(*ubus_object);
+        free((*ubus_object)->json_data);
+
+        int rc = ubus_object_clean_libyang_data(*ubus_object);
+        CHECK_RET_MSG(rc, cleanup, "clean ubus object libyang ");
+        rc = ubus_object_delete_all_methods(*ubus_object);
         CHECK_RET_MSG(rc , cleanup, "ubus object delete all methods error");
     }
 cleanup:
