@@ -56,7 +56,12 @@ int xpath_get_tail_node(const char *xpath, char **node)
     char* nth_ptr;
 
     nth_ptr=strrchr(xpath, '/');
-    CHECK_NULL_MSG(nth_ptr, &rc, cleanup, "'/' is not found in string");
+    if (nth_ptr == NULL)
+    {
+        INF_MSG("'/' is not found");
+        return -2;
+    }
+    //CHECK_NULL_MSG(nth_ptr, &rc, cleanup, "'/' is not found in string");
 
     int len = strlen(nth_ptr);
 

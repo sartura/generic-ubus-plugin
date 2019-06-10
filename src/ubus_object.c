@@ -81,7 +81,7 @@ int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_obj
     CHECK_NULL_MSG(f, &rc, cleanup, "input argument f is null");
 
     char xpath[256 + 1] = {0};
-    snprintf(xpath, strlen(ubus_object->yang_module) + 13, "/%s:state-data", ubus_object->yang_module);
+    snprintf(xpath, strlen(ubus_object->yang_module) + 4, "/%s:*", ubus_object->yang_module);
 
     INF_MSG("Subscribing to operational");
 	rc = sr_dp_get_items_subscribe(session,
