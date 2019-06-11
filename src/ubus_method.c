@@ -3,7 +3,7 @@
 
 int ubus_method_create(ubus_method_t **ubus_method)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
 
     *ubus_method = calloc(1, sizeof(ubus_method_t));
     CHECK_NULL_MSG(*ubus_method, &rc, cleanup, "return argument ubus_method is null");
@@ -64,7 +64,7 @@ cleanup:
 
 int ubus_method_get_name(ubus_method_t *ubus_method, char **name)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
     CHECK_NULL_MSG(ubus_method->name, &rc, cleanup, "ubus_metehod name is null");
 
@@ -76,7 +76,7 @@ cleanup:
 
 int ubus_method_get_message(ubus_method_t *ubus_method, char **message)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
     CHECK_NULL_MSG(ubus_method->message, &rc, cleanup, "ubus_metehod name is null");
 

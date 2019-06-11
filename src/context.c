@@ -2,7 +2,7 @@
 
 int context_create(context_t **context)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     *context = calloc(1, sizeof(context_t));
     CHECK_NULL_MSG(*context, &rc, cleanup, "input argument context is null");
 
@@ -18,7 +18,7 @@ cleanup:
 
 int context_set_session(context_t *context, sr_session_ctx_t *session)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(session, &rc, cleanup, "input argument session is null");
 
@@ -30,7 +30,7 @@ cleanup:
 
 int context_set_subscription(context_t *context, sr_subscription_ctx_t *subscription)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(subscription, &rc, cleanup, "input argument subscription is null");
 
@@ -42,7 +42,7 @@ cleanup:
 
 int context_set_startup_session(context_t *context, sr_session_ctx_t *session)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(session, &rc, cleanup, "input argument session is null");
 
@@ -54,7 +54,7 @@ cleanup:
 
 int context_set_startup_connection(context_t *context, sr_conn_ctx_t *connection)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(connection, &rc, cleanup, "input argument connection is null");
 
@@ -66,7 +66,7 @@ cleanup:
 
 int context_get_session(context_t *context, sr_session_ctx_t **session)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(context->session, &rc, cleanup, "context session is null");
 
@@ -78,7 +78,7 @@ cleanup:
 
 int context_get_subscription(context_t *context, sr_subscription_ctx_t **subscription)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(context->subscription, &rc, cleanup, "context subscription is null");
 
@@ -89,7 +89,7 @@ cleanup:
 }
 int context_get_startup_session(context_t *context, sr_session_ctx_t **session)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(context->startup_session, &rc, cleanup, "context startup_session is null");
 
@@ -100,7 +100,7 @@ cleanup:
 }
 int context_get_startup_connection(context_t *context, sr_conn_ctx_t **connection)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(context->startup_connection, &rc, cleanup, "context connection is null");
 
@@ -112,7 +112,7 @@ cleanup:
 
 int context_get_ubus_object(context_t *context, ubus_object_t **ubus_object, const char *ubus_object_name)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(ubus_object_name, &rc, cleanup, "input argument ubus_object_name is null");
 
@@ -134,7 +134,7 @@ cleanup:
 
 int context_add_ubus_object(context_t *context, ubus_object_t *ubus_object)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
 
@@ -146,7 +146,7 @@ cleanup:
 
 int context_delete_ubus_object(context_t *context, const char *ubus_object_name)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(ubus_object_name, &rc, cleanup, "input argument ubus_object_name is null");
 
@@ -167,7 +167,7 @@ cleanup:
 
 int context_delete_all_ubus_object(context_t *context)
 {
-     int rc = 0;
+     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     ubus_object_t *ubus_object_p = NULL;
     ubus_object_t *ubus_object_n = NULL;
@@ -185,7 +185,7 @@ void context_destroy(context_t **context)
 {
     if (*context != NULL)
     {
-        int rc = 0;
+        int rc = SR_ERR_OK;
         if ((*context)->startup_session != NULL)
         {
             rc = sr_session_stop((*context)->startup_session);

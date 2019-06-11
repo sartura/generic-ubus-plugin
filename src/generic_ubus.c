@@ -522,7 +522,6 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
         root = lyd_new(NULL, libyang_module, module_name);
         CHECK_NULL_MSG(root, &rc, cleanup, "libyang data root node");
 
-        // get the leaf , state data container is required to exists
         rc = xpath_get_tail_node(cb_xpath, &method_name);
         if ( rc == SR_ERR_INTERNAL )
         {
@@ -568,17 +567,20 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
         UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus lookup id error");
 
         blob_buf_init(&buf, 0);
-        blobmsg_add_json_from_string(&buf, ubus_method->message);
+        if (ubus_method->message != NULL)
+        {
+            blobmsg_add_json_from_string(&buf, ubus_method->message);
+        }
 
         char *result_json_data = NULL;
         urc = ubus_invoke(ubus_ctx, ubus_id, ubus_method->name, buf.head, ubus_get_response_cb, &result_json_data, 1000);
-        UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus invoke error");
+        UBUS_CHECK_RET(urc, &rc, cleanup, "ubus invoke error: %d", urc);
 
+        // TODO: remove this
         rc = ubus_object_set_json_data(ubus_object, result_json_data);
         CHECK_RET_MSG(rc, cleanup, "ubus object set json data error");
 
         blob_buf_free(&buf);
-
 
         char *json_data = NULL;
         rc = ubus_object_get_json_data(ubus_object, &json_data);

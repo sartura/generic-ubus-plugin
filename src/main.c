@@ -16,6 +16,14 @@
 #include "common.h"
 #include "xpath.h"
 
+#define RPC_UBUS_OBJECT "ubus-object"
+#define RPC_UBUS_METHOD "ubus-method"
+#define RPC_UBUS_METHOD_MESSAGE "ubus-method-message"
+#define RPC_UBUS_INVOCATION "ubus-invocation"
+#define RPC_UBUS_INVOCATION_XPATH "/terastream-generic-ubus:ubus-call/ubus-result[ubus-invocation='%s']/ubus-invocation"
+#define RPC_UBUS_RESPONSE_XPATH "/terastream-generic-ubus:ubus-call/ubus-result[ubus-invocation='%s']/ubus-response"
+#define JSON_EMPTY_OBJECT "{}"
+
 
 static int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name, sr_notif_event_t event, void *private_ctx)
 {
@@ -41,7 +49,6 @@ static int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_
 	return rc;
 }
 
-// TODO: add multiple ubus object support
 static int generic_ubus_rpc_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
 {
 	int rc = SR_ERR_OK;
@@ -54,51 +61,96 @@ static int generic_ubus_rpc_cb(const char *xpath, const sr_val_t *input, const s
     unsigned int ubus_id = 0;
 	struct blob_buf buf = {0};
 	sr_val_t *result = NULL;
+	size_t count = 0;
+	char ubus_invoke_string[256+1] = {0};
+	char *result_json_data = NULL;
+
 	*output_cnt = 0;
 
-	// get the expected data an create a ubus call
+	INF("%d",input_cnt);
+
 	for (int i = 0; i < input_cnt; i++)
 	{
 		rc = xpath_get_tail_node(input[i].xpath, &tail_node);
 		CHECK_RET_MSG(rc, cleanup, "get tail node error");
 
-		if (strcmp("ubus-object", tail_node) == 0) { ubus_object_name = input[i].data.string_val; }
-		else if (strcmp("ubus-method", tail_node) == 0) { ubus_method_name = input[i].data.string_val; }
-		else if (strcmp("ubus-method-message", tail_node) == 0) { ubus_message = input[i].data.string_val; }
+		if (strcmp(RPC_UBUS_OBJECT, tail_node) == 0)
+		{
+			ubus_object_name = input[i].data.string_val;
+		}
+		else if (strcmp(RPC_UBUS_METHOD, tail_node) == 0)
+		{
+			ubus_method_name = input[i].data.string_val;
+		}
+		else if (strcmp(RPC_UBUS_METHOD_MESSAGE, tail_node) == 0)
+		{
+			ubus_message = input[i].data.string_val;
+		}
 
+		uint8_t last = (i + 1) >= input_cnt;
+
+		if ((strstr(tail_node, RPC_UBUS_INVOCATION) != NULL && ubus_method_name != NULL && ubus_object_name != NULL ) || last == 1)
+		{
+			ubus_ctx = ubus_connect(NULL);
+			CHECK_NULL_MSG(ubus_ctx, &rc, cleanup, "ubus context is null");
+
+			urc = ubus_lookup_id(ubus_ctx, ubus_object_name, &ubus_id);
+			UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus lookup id error");
+
+			blob_buf_init(&buf, 0);
+			if (ubus_message != NULL)
+			{
+				blobmsg_add_json_from_string(&buf, ubus_message);
+			}
+
+			urc = ubus_invoke(ubus_ctx, ubus_id, ubus_method_name, buf.head, ubus_get_response_cb, &result_json_data, 1000);
+			UBUS_CHECK_RET(urc, &rc, cleanup, "ubus invoke error: %d", urc);
+
+			blob_buf_free(&buf);
+
+			if (ubus_ctx != NULL) {
+				ubus_free(ubus_ctx);
+				ubus_ctx = NULL;
+			}
+
+			rc = sr_realloc_values(count, count + 1, &result);
+			SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
+
+			memset(ubus_invoke_string, 0, 256+1);
+			int len = strlen(ubus_object_name) + strlen(ubus_method_name) + 2;
+			if (ubus_message != NULL)
+			{
+				len += (strlen(ubus_message) + 1);
+				snprintf(ubus_invoke_string, len, "%s %s %s", ubus_object_name, ubus_method_name, ubus_message);
+			}
+			else
+			{
+				len += (4 + 1);
+				snprintf(ubus_invoke_string, len, "%s %s %s", ubus_object_name, ubus_method_name, JSON_EMPTY_OBJECT);
+			}
+
+			rc = sr_val_build_xpath(&result[count], RPC_UBUS_INVOCATION_XPATH, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+
+			rc = sr_val_set_str_data(&result[count], SR_STRING_T, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+
+			rc = sr_val_build_xpath(&result[count], RPC_UBUS_RESPONSE_XPATH, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+
+			rc = sr_val_set_str_data(&result[count], SR_STRING_T, result_json_data);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+
+			free(result_json_data);
+			result_json_data = NULL;
+
+			count++;
+		}
 		free(tail_node);
 		tail_node = NULL;
 	}
 
-	// buffer, ubus call
-	ubus_ctx = ubus_connect(NULL);
-	CHECK_NULL_MSG(ubus_ctx, &rc, cleanup, "ubus context is null");
-
-	urc = ubus_lookup_id(ubus_ctx, ubus_object_name, &ubus_id);
-	UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus lookup id error");
-
-	blob_buf_init(&buf, 0);
-	if (ubus_message != NULL)
-	{
-		blobmsg_add_json_from_string(&buf, ubus_message);
-	}
-
-	char *result_json_data = NULL;
-	urc = ubus_invoke(ubus_ctx, ubus_id, ubus_method_name, buf.head, ubus_get_response_cb, &result_json_data, 1000);
-	UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus invoke error");
-
-	blob_buf_free(&buf);
-
-	rc = sr_new_values(1, &result);
-	SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
-
-	rc = sr_val_set_xpath(result, "/terastream-generic-ubus:ubus-call/ubus-response");
-	SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
-
-	rc = sr_val_set_str_data(result, SR_STRING_T, result_json_data);
-	SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
-
-	*output_cnt = 1;
+	*output_cnt = count;
 	*output = result;
 
 cleanup:
@@ -112,27 +164,7 @@ cleanup:
 	return rc;
 }
 
-/*
-static int
-#if defined(SYSREPO_LESS_0_7_5)
-generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, void *private_ctx)
-#elif defined(SYSREPO_LESS_0_7_7)
-generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, void *private_ctx)
-#else
-generic_ubus_operational_cb(const char *cb_xpath,
-							sr_val_t **values,
-							size_t *values_cnt,
-							uint64_t request_id,
-							const char *original_xpath,
-							void *private_ctx)
-#endif
-{
-	// TODO: add logic
-	INF("%s", __func__);
-	*values_cnt = 0;
-	return SR_ERR_OK;
-}
-*/
+
 int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
 {
 	// TODO: add logic
@@ -171,7 +203,7 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
 	SR_CHECK_RET(rc, cleanup, "initialization error: %s", sr_strerror(rc));
 
 	INF_MSG("Subscribing to rpc");
-	rc = sr_rpc_subscribe(session, "/terastream-generic-ubus:ubus-call", generic_ubus_rpc_cb, NULL, SR_SUBSCR_CTX_REUSE, &context->subscription);
+	rc = sr_rpc_subscribe(session, "/"YANG_MODEL":ubus-call", generic_ubus_rpc_cb, NULL, SR_SUBSCR_CTX_REUSE, &context->subscription);
 	SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
 /*
 	INF_MSG("Subscribing to operational");

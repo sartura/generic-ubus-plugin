@@ -4,7 +4,7 @@
 
 int ubus_object_create(ubus_object_t **ubus_object)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
 
     *ubus_object = calloc(1, sizeof(ubus_object_t));
     CHECK_NULL_MSG(*ubus_object, &rc, cleanup, "return argument ubus_object is null");
@@ -28,7 +28,7 @@ cleanup:
 
 int ubus_object_set_name(ubus_object_t *ubus_object, const char *name)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     char *name_local = NULL;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(name, &rc, cleanup, "input argument name is null");
@@ -50,7 +50,7 @@ cleanup:
 
 int ubus_object_set_yang_module(ubus_object_t *ubus_object, const char *yang_module)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     char *yang_module_local = NULL;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(yang_module, &rc, cleanup, "input argument yang_module is null");
@@ -97,7 +97,7 @@ cleanup:
 
 int ubus_object_add_method(ubus_object_t *ubus_object, ubus_method_t *ubus_method)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
 
@@ -109,7 +109,7 @@ cleanup:
 
 int ubus_object_delete_method(ubus_object_t *ubus_object, const char *method_name)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(method_name, &rc, cleanup, "input argument method_name is null");
 
@@ -126,7 +126,7 @@ cleanup:
 
 int ubus_object_delete_all_methods(ubus_object_t *ubus_object)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     ubus_method_t *ubus_method_p = NULL;
     ubus_method_t *ubus_method_n = NULL;
@@ -142,7 +142,7 @@ cleanup:
 
 int ubus_object_get_name(ubus_object_t *ubus_object, char **name)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(ubus_object->name, &rc, cleanup, "ubus_object name is null");
 
@@ -154,7 +154,7 @@ cleanup:
 
 int ubus_object_get_yang_module(ubus_object_t *ubus_object, char **yang_module)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(ubus_object->yang_module, &rc, cleanup, "ubus_object yang_module is null");
 
@@ -167,7 +167,7 @@ cleanup:
 
 int ubus_object_get_method(ubus_object_t *ubus_object, ubus_method_t **ubus_method, const char *method_name)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
 
     ubus_method_t *ubus_method_local = NULL;
@@ -188,7 +188,7 @@ cleanup:
 
 int ubus_object_unsubscribe(sr_session_ctx_t *session, ubus_object_t *ubus_object)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     //CHECK_NULL_MSG(ubus_object->state_data_subscription, &rc, cleanup, "state_data_subscription is null");
     CHECK_NULL_MSG(session, &rc, cleanup, "input argument session is null");
@@ -240,7 +240,7 @@ cleanup:
 
 int ubus_object_get_libyang_schema(ubus_object_t *ubus_object ,struct lys_module **module)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(ubus_object->libyang_ctx, &rc, cleanup, "ubus_object libyang_ctx is null");
 
@@ -264,7 +264,7 @@ cleanup:
 
 int ubus_object_get_json_data(ubus_object_t *ubus_object, char **json_data)
 {
-    int rc = 0;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(ubus_object->json_data, &rc, cleanup, "ubus_object json_data is null");
 
