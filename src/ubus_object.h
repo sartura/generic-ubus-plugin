@@ -13,7 +13,6 @@
 struct ubus_object_s {
 	char *name;
 	char *yang_module;
-	char *json_data;
 
 	sr_subscription_ctx_t *state_data_subscription;
 
@@ -46,7 +45,5 @@ void ubus_object_destroy(ubus_object_t **ubus_object);
 int ubus_object_init_libyang_data(ubus_object_t *ubus_object, sr_session_ctx_t *session);
 int ubus_object_get_libyang_schema(ubus_object_t *ubus_object ,struct lys_module **module);
 int ubus_object_clean_libyang_data(ubus_object_t *ubus_object);
-int ubus_object_get_json_data(ubus_object_t *ubus_object, char **json_data);
-int ubus_object_set_json_data(ubus_object_t *ubus_object, char *json_data);
 
 #endif // _UBUS_OBJECT_H_

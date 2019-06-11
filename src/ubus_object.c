@@ -15,7 +15,6 @@ int ubus_object_create(ubus_object_t **ubus_object)
 
     (*ubus_object)->libyang_ctx = NULL;
     (*ubus_object)->libyang_module = NULL;
-    (*ubus_object)->json_data = NULL;
 
     INIT_LIST_HEAD(&((*ubus_object)->ubus_method_list));
 
@@ -262,39 +261,13 @@ cleanup:
     return rc;
 }
 
-int ubus_object_get_json_data(ubus_object_t *ubus_object, char **json_data)
-{
-    int rc = SR_ERR_OK;
-    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
-    CHECK_NULL_MSG(ubus_object->json_data, &rc, cleanup, "ubus_object json_data is null");
-
-
-    *json_data = ubus_object->json_data;
-
-cleanup:
-    return rc;
-}
-
-int ubus_object_set_json_data(ubus_object_t *ubus_object, char *json_data)
-{
-    int rc = SR_ERR_OK;
-    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
-    CHECK_NULL_MSG(json_data, &rc, cleanup, "input json_data is null");
-
-    if (ubus_object->json_data != NULL) { free(ubus_object->json_data); }
-    ubus_object->json_data = json_data;
-
-cleanup:
-    return rc;
-}
-
 void ubus_object_destroy(ubus_object_t **ubus_object)
 {
     if (*ubus_object != NULL)
     {
         free((*ubus_object)->name);
         free((*ubus_object)->yang_module);
-        free((*ubus_object)->json_data);
+
 
         int rc = ubus_object_clean_libyang_data(*ubus_object);
         CHECK_RET_MSG(rc, cleanup, "clean ubus object libyang ");
