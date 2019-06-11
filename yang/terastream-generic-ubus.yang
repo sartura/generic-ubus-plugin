@@ -18,9 +18,13 @@ module terastream-generic-ubus {
           module specified.
           ";
 
+     revision "2019-06-10" {
+          description "Add rpc support for ubus calls.";
+     }
      revision "2019-03-20" {
           description "Initial revision.";
      }
+
 
      container generic-ubus-config {
           description
@@ -65,5 +69,34 @@ module terastream-generic-ubus {
                }
           }
      }
-     // TODO: add rpc-s
+
+     rpc ubus-call {
+          description
+               "RPC for implementig the ubus call for ubus object that do not
+               have their YANG module implemented on the system.";
+          status current;
+          input {
+               leaf ubus-object {
+                    description "Ubus object name.";
+                    mandatory true;
+                    type string;
+               }
+               leaf ubus-method {
+                    description "Ubus object method name.";
+                    mandatory true;
+                    type string;
+               }
+               leaf ubus-method-message {
+                    description "Ubus object method message.";
+                    type string;
+               }
+          }
+          output {
+               leaf ubus-response {
+                    description
+                         "Ubus object method response containing a JSON message.";
+                    type string;
+               }
+          }
+     }
 }

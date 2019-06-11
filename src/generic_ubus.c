@@ -30,7 +30,6 @@ static int generic_ubus_modify_ubus_method(context_t *context, sr_val_t *value);
 static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value);
 static int generic_ubus_set_context(context_t *context, sr_val_t *value);
 static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, const char *original_xpath, void *private_ctx);
-static void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg);
 static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node, size_t *count);
 static int generic_ubus_set_sysrepo_data(struct lyd_node *root, sr_val_t **values, size_t *values_cnt);
 static int generic_ubus_libyang_to_sysrepo(struct lyd_node_leaf_list *node, sr_val_t *value);
@@ -57,6 +56,7 @@ int generic_ubus_load_startup_datastore(context_t *context)
     INF("setting context data: %d", count);
     for (size_t i = 0; i < count; i++)
     {
+        // TODO: possible rewrite because of RPC support
         generic_ubus_set_context(context, &(values[i]));
     }
 
@@ -641,8 +641,7 @@ cleanup:
     return rc;
 }
 
-// TODO: use char as private context
-static void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg)
+void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg)
 {
 
     if (msg == NULL) {

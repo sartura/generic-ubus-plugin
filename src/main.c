@@ -4,16 +4,21 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
+#include <libubus.h>
+#include <libubox/blobmsg_json.h>
+#include <json-c/json.h>
+
+#include "sysrepo.h"
+#include "sysrepo/values.h"
+
 #include "context.h"
 #include "generic_ubus.h"
 #include "common.h"
+#include "xpath.h"
 
 
 static int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name, sr_notif_event_t event, void *private_ctx)
 {
-	// TODO: add logic
-	INF("%s", __func__);
-	INF("%s", module_name);
 	int rc = SR_ERR_OK;
 	context_t *context = (context_t *)private_ctx;
 
@@ -35,6 +40,78 @@ static int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_
 	rc = generic_ubus_apply_module_changes(context, module_name, session);
 	return rc;
 }
+
+// TODO: add multiple ubus object support
+static int generic_ubus_rpc_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
+{
+	int rc = SR_ERR_OK;
+	char *tail_node = NULL;
+	char *ubus_object_name = NULL;
+	char *ubus_method_name = NULL;
+	char *ubus_message = NULL;
+	int urc = UBUS_STATUS_OK;
+	struct ubus_context *ubus_ctx = NULL;
+    unsigned int ubus_id = 0;
+	struct blob_buf buf = {0};
+	sr_val_t *result = NULL;
+	*output_cnt = 0;
+
+	// get the expected data an create a ubus call
+	for (int i = 0; i < input_cnt; i++)
+	{
+		rc = xpath_get_tail_node(input[i].xpath, &tail_node);
+		CHECK_RET_MSG(rc, cleanup, "get tail node error");
+
+		if (strcmp("ubus-object", tail_node) == 0) { ubus_object_name = input[i].data.string_val; }
+		else if (strcmp("ubus-method", tail_node) == 0) { ubus_method_name = input[i].data.string_val; }
+		else if (strcmp("ubus-method-message", tail_node) == 0) { ubus_message = input[i].data.string_val; }
+
+		free(tail_node);
+		tail_node = NULL;
+	}
+
+	// buffer, ubus call
+	ubus_ctx = ubus_connect(NULL);
+	CHECK_NULL_MSG(ubus_ctx, &rc, cleanup, "ubus context is null");
+
+	urc = ubus_lookup_id(ubus_ctx, ubus_object_name, &ubus_id);
+	UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus lookup id error");
+
+	blob_buf_init(&buf, 0);
+	if (ubus_message != NULL)
+	{
+		blobmsg_add_json_from_string(&buf, ubus_message);
+	}
+
+	char *result_json_data = NULL;
+	urc = ubus_invoke(ubus_ctx, ubus_id, ubus_method_name, buf.head, ubus_get_response_cb, &result_json_data, 1000);
+	UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus invoke error");
+
+	blob_buf_free(&buf);
+
+	rc = sr_new_values(1, &result);
+	SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
+
+	rc = sr_val_set_xpath(result, "/terastream-generic-ubus:ubus-call/ubus-response");
+	SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+
+	rc = sr_val_set_str_data(result, SR_STRING_T, result_json_data);
+	SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+
+	*output_cnt = 1;
+	*output = result;
+
+cleanup:
+	if (ubus_ctx != NULL) {
+		ubus_free(ubus_ctx);
+	}
+
+	free(tail_node);
+	free(result_json_data);
+	blob_buf_free(&buf);
+	return rc;
+}
+
 /*
 static int
 #if defined(SYSREPO_LESS_0_7_5)
@@ -92,6 +169,10 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
 	INF_MSG("Subcribing to module change");
 	rc = sr_module_change_subscribe(session, YANG_MODEL, generic_ubus_change_cb, *private_ctx, 0, SR_SUBSCR_DEFAULT, &context->subscription);
 	SR_CHECK_RET(rc, cleanup, "initialization error: %s", sr_strerror(rc));
+
+	INF_MSG("Subscribing to rpc");
+	rc = sr_rpc_subscribe(session, "/terastream-generic-ubus:ubus-call", generic_ubus_rpc_cb, NULL, SR_SUBSCR_CTX_REUSE, &context->subscription);
+	SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
 /*
 	INF_MSG("Subscribing to operational");
 	rc = sr_dp_get_items_subscribe(session,
