@@ -4,10 +4,6 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-#include <libubus.h>
-#include <libubox/blobmsg_json.h>
-#include <json-c/json.h>
-
 #include "sysrepo.h"
 #include "sysrepo/values.h"
 
@@ -15,6 +11,7 @@
 #include "generic_ubus.h"
 #include "common.h"
 #include "xpath.h"
+#include "ubus_call.h"
 
 #define RPC_UBUS_OBJECT "ubus-object"
 #define RPC_UBUS_METHOD "ubus-method"
@@ -56,10 +53,6 @@ static int generic_ubus_rpc_cb(const char *xpath, const sr_val_t *input, const s
 	char *ubus_object_name = NULL;
 	char *ubus_method_name = NULL;
 	char *ubus_message = NULL;
-	int urc = UBUS_STATUS_OK;
-	struct ubus_context *ubus_ctx = NULL;
-    unsigned int ubus_id = 0;
-	struct blob_buf buf = {0};
 	sr_val_t *result = NULL;
 	size_t count = 0;
 	char ubus_invoke_string[256+1] = {0};
@@ -91,27 +84,9 @@ static int generic_ubus_rpc_cb(const char *xpath, const sr_val_t *input, const s
 
 		if ((strstr(tail_node, RPC_UBUS_INVOCATION) != NULL && ubus_method_name != NULL && ubus_object_name != NULL ) || last == 1)
 		{
-			ubus_ctx = ubus_connect(NULL);
-			CHECK_NULL_MSG(ubus_ctx, &rc, cleanup, "ubus context is null");
 
-			urc = ubus_lookup_id(ubus_ctx, ubus_object_name, &ubus_id);
-			UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus lookup id error");
-
-			blob_buf_init(&buf, 0);
-			if (ubus_message != NULL)
-			{
-				blobmsg_add_json_from_string(&buf, ubus_message);
-			}
-
-			urc = ubus_invoke(ubus_ctx, ubus_id, ubus_method_name, buf.head, ubus_get_response_cb, &result_json_data, 1000);
-			UBUS_CHECK_RET(urc, &rc, cleanup, "ubus invoke error: %d", urc);
-
-			blob_buf_free(&buf);
-
-			if (ubus_ctx != NULL) {
-				ubus_free(ubus_ctx);
-				ubus_ctx = NULL;
-			}
+			rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+			CHECK_RET_MSG(rc, cleanup, "ubus call error");
 
 			rc = sr_realloc_values(count, count + 1, &result);
 			SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
@@ -154,13 +129,9 @@ static int generic_ubus_rpc_cb(const char *xpath, const sr_val_t *input, const s
 	*output = result;
 
 cleanup:
-	if (ubus_ctx != NULL) {
-		ubus_free(ubus_ctx);
-	}
-
 	free(tail_node);
 	free(result_json_data);
-	blob_buf_free(&buf);
+
 	return rc;
 }
 

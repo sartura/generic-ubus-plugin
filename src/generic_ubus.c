@@ -1,12 +1,10 @@
-#include <libubus.h>
-#include <libubox/blobmsg_json.h>
-#include <json-c/json.h>
-
 #include "generic_ubus.h"
 #include "xpath.h"
 #include "sysrepo/values.h"
 
 #include "libyang/tree_data.h"
+
+#include "ubus_call.h"
 
 #define YANG_UBUS_OBJECT "ubus-object"
 #define YANG_UBUS_METHOD "method"
@@ -463,16 +461,14 @@ cleanup:
 static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, const char *original_xpath, void *private_ctx)
 {
     int rc = SR_ERR_OK;
-    int urc = UBUS_STATUS_OK;
     context_t *context = (context_t *)private_ctx;
     static uint64_t request = 0;
     static ubus_object_t *ubus_object = NULL;
-    struct ubus_context *ubus_ctx = NULL;
-    unsigned int ubus_id = 0;
     char *module_name = NULL;
     char *method_name = NULL;
+    char *ubus_object_name = NULL;
+    char *ubus_message = NULL;
     static char *ubus_method_name = NULL;
-    struct blob_buf buf = {0};
     json_object *parsed_json = NULL;
     struct lyd_node *root = NULL;
     struct lyd_node *parent = NULL;
@@ -561,21 +557,15 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
         rc = ubus_method_get_name(ubus_method, &ubus_method_name);
         CHECK_RET_MSG(rc, cleanup, "ubus method get method name error");
 
-        ubus_ctx = ubus_connect(NULL);
-        CHECK_NULL_MSG(ubus_ctx, &rc, cleanup, "ubus context is null");
+        rc = ubus_method_get_message(ubus_method, &ubus_message);
+        CHECK_RET_MSG(rc, cleanup, "ubus method get method message error");
 
-        urc = ubus_lookup_id(ubus_ctx, ubus_object->name, &ubus_id);
-        UBUS_CHECK_RET_MSG(urc, &rc, cleanup, "ubus lookup id error");
-
-        blob_buf_init(&buf, 0);
-        if (ubus_method->message != NULL)
-        {
-            blobmsg_add_json_from_string(&buf, ubus_method->message);
-        }
+        rc = ubus_object_get_name(ubus_object, &ubus_object_name);
+        CHECK_RET_MSG(rc, cleanup, "ubus object get name error");
 
         result_json_data = NULL;
-        urc = ubus_invoke(ubus_ctx, ubus_id, ubus_method->name, buf.head, ubus_get_response_cb, &result_json_data, 1000);
-        UBUS_CHECK_RET(urc, &rc, cleanup, "ubus invoke error: %d", urc);
+        rc = ubus_call(ubus_object->name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+        CHECK_RET_MSG(rc, cleanup, "ubus call error");
 
         parsed_json = json_tokener_parse(result_json_data);
         CHECK_NULL_MSG(parsed_json, &rc, cleanup, "tokener parser error");
@@ -617,42 +607,15 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
     }
 
 cleanup:
-    // ubus object and msg blob clean up
-    if (ubus_ctx != NULL) {
-		ubus_free(ubus_ctx);
-	}
-
     free(module_name);
     free(method_name);
     free(result_json_data);
 
     if (parsed_json != NULL) { json_object_put(parsed_json); }
 
-    blob_buf_free(&buf);
-
     if (root != NULL) { lyd_free_withsiblings(root); }
 
     return rc;
-}
-
-void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg)
-{
-
-    if (msg == NULL) {
-		return;
-	}
-
-    int rc = SR_ERR_OK;
-    char **data = req->priv;
-
-    char *result_str = blobmsg_format_json(msg, true);
-    CHECK_NULL_MSG(result_str, &rc, cleanup, "json data is null");
-
-    *data = strdup(result_str);
-
-cleanup:
-    free(result_str);
-    return;
 }
 
 static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node, size_t *count)

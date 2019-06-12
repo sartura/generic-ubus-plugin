@@ -78,7 +78,7 @@ int ubus_method_get_message(ubus_method_t *ubus_method, char **message)
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
-    CHECK_NULL_MSG(ubus_method->message, &rc, cleanup, "ubus_metehod name is null");
+    //CHECK_NULL_MSG(ubus_method->message, &rc, cleanup, "ubus_metehod name is null");
 
     *message = ubus_method->message;
 

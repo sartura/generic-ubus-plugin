@@ -8,6 +8,5 @@
 
 int generic_ubus_apply_module_changes(context_t *context, const char *module_name, sr_session_ctx_t *session);
 int generic_ubus_load_startup_datastore(context_t *context);
-void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg);
 
 #endif //_GENERIC_UBUS_H_
