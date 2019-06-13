@@ -18,6 +18,9 @@ module terastream-generic-ubus {
           module specified.
           ";
 
+     revision "2019-06-12" {
+          description "Add module install and feature enable RPC support.";
+     }
      revision "2019-06-11" {
           description "Add multiple ubus object method calls in rpc.";
      }
@@ -99,11 +102,90 @@ module terastream-generic-ubus {
           }
           output {
                list ubus-result {
+                    description "Ubus call result.";
                     key ubus-invocation;
                     leaf ubus-invocation {
+                         description
+                              "Ubus object, ubus method and message that was
+                              invoked to produce this result";
                          type string;
                     }
                     leaf ubus-response {
+                         description
+                              "The response message of the invoked ubus call";
+                         type string;
+                    }
+               }
+          }
+     }
+
+     rpc module-install {
+          description "RPC for installing a ubus specific YANG module.";
+          status current;
+          input {
+               leaf-list module-name-full {
+                    description
+                    "Name of the module to be installed.
+                    Path to module included";
+                    type string;
+               }
+          }
+          output {
+               list module-install-result {
+                    key module-name-full;
+                    leaf module-name-full {
+                         type string;
+                    }
+                    leaf module-install-status {
+                         type string;
+                    }
+               }
+          }
+     }
+
+     rpc feature-update {
+          description
+               "RPC for enabeling and disabeling features for a YANG module";
+          status current;
+          input {
+               list feature-update-invocation {
+                    key "module-name feature-name";
+                    leaf module-name {
+                         description
+                              "Module for which a feature needs
+                              to be enabled/disabled.";
+                         type string;
+                    }
+                    leaf feature-name {
+                         description
+                              "Feature that needs to be enabled/disabled.";
+                         type string;
+                    }
+                    choice feature-action {
+                         description
+                              "Desired operation. Either enable or disable a feature";
+                         case enable-action {
+                              container enable {
+                                   presence
+                                        "Enable feature if this conatiner is present.";
+                              }
+                         }
+                         case disable-action {
+                              container disable {
+                                   presence
+                                        "Disabeling feature if this conatiner is present.";
+                              }
+                         }
+                    }
+               }
+          }
+          output {
+               list feature-update-result {
+                    key feature-invocation-full;
+                    leaf feature-invocation-full {
+                         type string;
+                    }
+                    leaf feature-update-status {
                          type string;
                     }
                }
