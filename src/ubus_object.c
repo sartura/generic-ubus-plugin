@@ -70,13 +70,12 @@ cleanup:
 }
 
 
-int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, int (*f)(const char *, sr_val_t **, size_t *, uint64_t, const char *, void *))
+int ubus_object_state_data_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, int (*f)(const char *, sr_val_t **, size_t *, uint64_t, const char *, void *))
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(private_ctx, &rc, cleanup, "input argument private_ctx is null");
     CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(session, &rc, cleanup, "input argument session is null");
-    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
     CHECK_NULL_MSG(f, &rc, cleanup, "input argument f is null");
 
     char xpath[256 + 1] = {0};
@@ -89,7 +88,56 @@ int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_obj
 								   private_ctx,
 								   SR_SUBSCR_CTX_REUSE,
 								   &ubus_object->state_data_subscription);
-    CHECK_RET(rc, cleanup, "dp subscription: %s", sr_strerror(rc));
+    SR_CHECK_RET(rc, cleanup, "dp subscription: %s", sr_strerror(rc));
+cleanup:
+    return rc;
+}
+/*
+int ubus_object_feature_enable_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, void (*f)(const char *, const char *, bool, void *))
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(private_ctx, &rc, cleanup, "input argument private_ctx is null");
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(session, &rc, cleanup, "input argument session is null");
+    CHECK_NULL_MSG(f, &rc, cleanup, "input argument f is null");
+
+    rc = sr_feature_enable_subscribe(session, f, private_ctx, SR_SUBSCR_CTX_REUSE, &ubus_object->state_data_subscription);
+    SR_CHECK_RET(rc, cleanup, "feature subscription error: %s", sr_strerror(rc));
+
+cleanup:
+    return rc;
+}
+*/
+int ubus_object_libyang_feature_enable(ubus_object_t *ubus_object, const char *feature_name)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(feature_name, &rc, cleanup, "input argument feature_name is null");
+
+    int lrc = lys_features_enable(ubus_object->libyang_module, feature_name);
+    if (lrc != 0)
+    {
+        rc = SR_ERR_INTERNAL;
+        ERR("libyang feature enable error: %d", lrc);
+    }
+
+cleanup:
+    return rc;
+}
+
+int ubus_object_libyang_feature_disable(ubus_object_t *ubus_object, const char *feature_name)
+{
+        int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
+    CHECK_NULL_MSG(feature_name, &rc, cleanup, "input argument feature_name is null");
+
+    int lrc = lys_features_disable(ubus_object->libyang_module, feature_name);
+    if (lrc != 0)
+    {
+        rc = SR_ERR_INTERNAL;
+        ERR("libyang feature disable error: %d", lrc);
+    }
+
 cleanup:
     return rc;
 }
@@ -220,19 +268,49 @@ int ubus_object_init_libyang_data(ubus_object_t *ubus_object, sr_session_ctx_t *
     libyang_ctx = ly_ctx_new(NULL, LY_CTX_ALLIMPLEMENTED );
     CHECK_NULL_MSG(libyang_ctx, &rc, cleanup, "libyang_ctx is null");
 
-
     rc = sr_get_schema(session, ubus_object->yang_module, NULL, NULL, SR_SCHEMA_YANG, &sysrepo_schema);
     CHECK_RET_MSG(rc, cleanup, "get schema from sysrepo error");
 
     libyang_module = (struct lys_module *) lys_parse_mem(libyang_ctx, sysrepo_schema, LYS_IN_YANG);
     CHECK_NULL_MSG(libyang_module, &rc, cleanup, "ly module  is null");
 
+    sr_schema_t *schemas = NULL;
+	size_t schema_cnt = 0;
+
     ubus_object->libyang_ctx = libyang_ctx;
     ubus_object->libyang_module = libyang_module;
+
+	rc = sr_list_schemas(session, &schemas, &schema_cnt);
+	CHECK_RET(rc, cleanup, "failed sr_list_schemas: %s", sr_strerror(rc));
+	for (size_t s = 0; s < schema_cnt; s++) {
+		if (0 == strcmp(ubus_object->yang_module, schemas[s].module_name)) {
+			for (size_t i = 0; i < schemas[s].enabled_feature_cnt; i++) {
+                INF("FEATURE: %s", schemas[s].enabled_features[i]);
+				rc = ubus_object_libyang_feature_enable(ubus_object, schemas[s].enabled_features[i]);
+                CHECK_RET_MSG(rc, cleanup, "ubus object feature enable");
+			}
+		}
+	}
+
+    free(sysrepo_schema);
+    if (NULL != schemas && schema_cnt > 0) {
+		sr_free_schemas(schemas, schema_cnt);
+	}
+
+    return rc;
 
 cleanup:
 
     free(sysrepo_schema);
+    if (NULL != schemas && schema_cnt > 0) {
+		sr_free_schemas(schemas, schema_cnt);
+	}
+
+    // free libyang stuff in case of error
+    if (libyang_ctx != NULL)
+    {
+        ly_ctx_destroy(libyang_ctx, NULL);
+    }
 
     return rc;
 }

@@ -31,7 +31,10 @@ typedef struct ubus_object_s ubus_object_t;
 list_for_each_entry(__uom, &__uo->ubus_method_list, list)
 
 int ubus_object_create(ubus_object_t **ubus_object);
-int ubus_object_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, int (*f)(const char *, sr_val_t **, size_t *, uint64_t, const char *, void *));
+int ubus_object_state_data_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, int (*f)(const char *, sr_val_t **, size_t *, uint64_t, const char *, void *));
+//int ubus_object_feature_enable_subscribe(sr_session_ctx_t *session, void *private_ctx, ubus_object_t *ubus_object, void (*f)(const char *, const char *, bool, void *));
+int ubus_object_libyang_feature_enable(ubus_object_t *ubus_object, const char *feature_name);
+int ubus_object_libyang_feature_disable(ubus_object_t *ubus_object, const char *feature_name);
 int ubus_object_set_name(ubus_object_t *ubus_object, const char *name);
 int ubus_object_set_yang_module(ubus_object_t *ubus_object, const char *yang_module);
 int ubus_object_unsubscribe(sr_session_ctx_t *session, ubus_object_t *ubus_object);

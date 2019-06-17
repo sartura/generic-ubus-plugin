@@ -239,9 +239,12 @@ static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value)
         rc = ubus_object_set_yang_module(ubus_object, value->data.string_val);
         CHECK_RET_MSG(rc, cleanup, "set ubus object yang module error");
 
-        rc = ubus_object_subscribe(context->session, (void *)context, ubus_object, generic_ubus_operational_cb);
-        CHECK_RET_MSG(rc, cleanup, "subscribe error");
-
+        rc = ubus_object_state_data_subscribe(context->session, (void *)context, ubus_object, generic_ubus_operational_cb);
+        CHECK_RET_MSG(rc, cleanup, "module change subscribe error");
+/*
+        rc = ubus_object_feature_enable_subscribe(context->session, (void *)context, ubus_object, generic_ubus_feature_cb);
+        CHECK_RET_MSG(rc, cleanup, "feature subscribe error");
+*/
         rc = ubus_object_init_libyang_data(ubus_object, context->session);
         CHECK_RET_MSG(rc, cleanup, "init libyang context error");
     }
@@ -458,6 +461,41 @@ cleanup:
     return rc;
 }
 
+void generic_ubus_feature_cb(const char *module_name, const char *feature_name, bool enabled, void *private_ctx)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(private_ctx, &rc, cleanup, "input argument private_ctx is null");
+    context_t *context = (context_t *)private_ctx;
+    ubus_object_t *ubus_object_it = NULL;
+    ubus_object_t *ubus_object = NULL;
+    context_for_each_ubus_object(context, ubus_object_it)
+    {
+        char *ubus_object_module_name = NULL;
+        rc = ubus_object_get_yang_module(ubus_object_it, &ubus_object_module_name);
+        CHECK_RET_MSG(rc, cleanup, "error getting yang module name");
+        if (strncmp(ubus_object_module_name, module_name, strlen(ubus_object_module_name)) == 0)
+        {
+            ubus_object = ubus_object_it;
+            break;
+        }
+    }
+
+    if (ubus_object == NULL) { return; }
+    if (enabled == true)
+    {
+        rc = ubus_object_libyang_feature_enable(ubus_object, feature_name);
+        CHECK_RET_MSG(rc, cleanup, "ubus object libyang enable feature error");
+    }
+    else
+    {
+        rc = ubus_object_libyang_feature_disable(ubus_object, feature_name);
+        CHECK_RET_MSG(rc, cleanup, "ubus object libyang disable feature error");
+    }
+cleanup:
+    return;
+}
+
+// TODO: check this for bug with feature support
 static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, const char *original_xpath, void *private_ctx)
 {
     int rc = SR_ERR_OK;
@@ -576,7 +614,6 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
         rc = generic_ubus_walk_json(parsed_json, libyang_module, parent, &count);
         CHECK_RET_MSG(rc, cleanup, "generic ubus walk json error");
 
-
         // validate the libyang
         if (lyd_validate(&root, LYD_OPT_DATA_NO_YANGLIB, NULL) != 0)
         {
@@ -612,7 +649,6 @@ cleanup:
     free(result_json_data);
 
     if (parsed_json != NULL) { json_object_put(parsed_json); }
-
     if (root != NULL) { lyd_free_withsiblings(root); }
 
     return rc;
@@ -636,7 +672,7 @@ static int generic_ubus_walk_json(json_object *object, struct lys_module *module
         }
         else if (type == json_type_array)
         {
-            CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
+            //CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
             size_t json_array_length = json_object_array_length(value);
             for (size_t i = 0; i < json_array_length; i++)
             {
@@ -787,3 +823,293 @@ static int generic_ubus_libyang_to_sysrepo(struct lyd_node_leaf_list *node, sr_v
 cleanup:
     return rc;
 }
+
+int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name, sr_notif_event_t event, void *private_ctx)
+{
+	int rc = SR_ERR_OK;
+	context_t *context = (context_t *)private_ctx;
+
+	INF("%d", event);
+
+	if (SR_EV_APPLY == event)
+	{
+		/* copy running datastore to startup */
+        rc = sr_copy_config(context->startup_session, YANG_MODEL, SR_DS_RUNNING, SR_DS_STARTUP);
+        if (SR_ERR_OK != rc) {
+            WRN_MSG("Failed to copy running datastore to startup");
+            return rc;
+		}
+		return SR_ERR_OK;
+	}
+
+	rc = generic_ubus_apply_module_changes(context, module_name, session);
+	return rc;
+}
+
+int generic_ubus_ubus_call_rpc_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
+{
+	int rc = SR_ERR_OK;
+	char *tail_node = NULL;
+	char *ubus_object_name = NULL;
+	char *ubus_method_name = NULL;
+	char *ubus_message = NULL;
+	sr_val_t *result = NULL;
+	size_t count = 0;
+	char ubus_invoke_string[256+1] = {0};
+	char *result_json_data = NULL;
+
+	*output_cnt = 0;
+
+	INF("%d",input_cnt);
+
+	for (int i = 0; i < input_cnt; i++)
+	{
+		rc = xpath_get_tail_node(input[i].xpath, &tail_node);
+		CHECK_RET_MSG(rc, cleanup, "get tail node error");
+
+		if (strcmp(RPC_UBUS_OBJECT, tail_node) == 0)
+		{
+			ubus_object_name = input[i].data.string_val;
+		}
+		else if (strcmp(RPC_UBUS_METHOD, tail_node) == 0)
+		{
+			ubus_method_name = input[i].data.string_val;
+		}
+		else if (strcmp(RPC_UBUS_METHOD_MESSAGE, tail_node) == 0)
+		{
+			ubus_message = input[i].data.string_val;
+		}
+
+		uint8_t last = (i + 1) >= input_cnt;
+
+		if ((strstr(tail_node, RPC_UBUS_INVOCATION) != NULL && ubus_method_name != NULL && ubus_object_name != NULL ) || last == 1)
+		{
+
+			rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+			CHECK_RET_MSG(rc, cleanup, "ubus call error");
+
+			rc = sr_realloc_values(count, count + 2, &result);
+			SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
+
+			memset(ubus_invoke_string, 0, 256+1);
+			int len = strlen(ubus_object_name) + strlen(ubus_method_name) + 2;
+			if (ubus_message != NULL)
+			{
+				len += (strlen(ubus_message) + 1);
+				snprintf(ubus_invoke_string, len, "%s %s %s", ubus_object_name, ubus_method_name, ubus_message);
+			}
+			else
+			{
+				len += (4 + 1);
+				snprintf(ubus_invoke_string, len, "%s %s %s", ubus_object_name, ubus_method_name, JSON_EMPTY_OBJECT);
+			}
+
+			rc = sr_val_build_xpath(&result[count], RPC_UBUS_INVOCATION_XPATH, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+
+			rc = sr_val_set_str_data(&result[count], SR_STRING_T, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+
+			count++;
+
+			rc = sr_val_build_xpath(&result[count], RPC_UBUS_RESPONSE_XPATH, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+
+			rc = sr_val_set_str_data(&result[count], SR_STRING_T, result_json_data);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+
+			free(result_json_data);
+			result_json_data = NULL;
+
+			count++;
+		}
+		free(tail_node);
+		tail_node = NULL;
+	}
+
+	*output_cnt = count;
+	*output = result;
+
+	return rc;
+
+cleanup:
+	free(tail_node);
+	free(result_json_data);
+	if (result != NULL) { sr_free_values(result, count); }
+
+	return rc;
+}
+
+int generic_ubus_module_install_rpc_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
+{
+	int rc = SR_ERR_OK;
+	int src = 0;
+	char *path_to_module = NULL;
+	char command[256+1] = {0};
+	char return_message[256+1] = {0};
+	sr_val_t *return_values = NULL;
+	size_t count = 0;
+
+
+	// get module name (path included)
+	*output_cnt = 0;
+	for (size_t i = 0; i < input_cnt; i++)
+	{
+		memset(return_message, 0, 256+1);
+		memset(command, 0, 256+1);
+
+		path_to_module = input[i].data.string_val;
+		INF("%s", path_to_module);
+
+		sprintf(command, "sysrepoctl -i -g %s", path_to_module);
+		// fork ?
+		src = system(command);
+		if (src == -1)
+		{
+			ERR("error while executing `system` command: %d", src);
+			rc = SR_ERR_INTERNAL;
+			goto cleanup;
+		}
+		else if (src == 0)
+		{
+			sprintf(return_message, "Installation of module %s succeeded", path_to_module);
+		}
+		else
+		{
+			sprintf(return_message, "Installation of module %s failed, error: %d", path_to_module, src);
+		}
+		rc = sr_realloc_values(count, count + 2, &return_values);
+		SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
+
+		rc = sr_val_build_xpath(&return_values[count], RPC_MODULE_PATH_XPATH, path_to_module);
+		SR_CHECK_RET(rc, cleanup, "sr set xpath for value error: %s", sr_strerror(rc));
+
+		rc = sr_val_set_str_data(&return_values[count], SR_STRING_T, path_to_module);
+		SR_CHECK_RET(rc, cleanup, "sr set string value error: %s", sr_strerror(rc));
+
+		count++;
+
+		rc = sr_val_build_xpath(&return_values[count], RPC_MODULE_RESPONSE_XPATH, path_to_module);
+		SR_CHECK_RET(rc, cleanup, "sr set xpath for value error: %s", sr_strerror(rc));
+
+		rc = sr_val_set_str_data(&return_values[count], SR_STRING_T, return_message);
+		SR_CHECK_RET(rc, cleanup, "sr set string value error: %s", sr_strerror(rc));
+
+		count++;
+	}
+	*output_cnt = count;
+	*output = return_values;
+
+cleanup:
+	return rc;
+}
+
+int generic_ubus_feature_update_rpc_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
+{
+	int rc = SR_ERR_OK;
+	int src = 0;
+	char *tail_node = NULL;
+	uint8_t enable_feature = 0;
+	char *yang_module_name = NULL;
+	char *feature_name = NULL;
+	sr_val_t *return_values = NULL;
+	size_t count = 0;
+
+	char command[256+1] = {0};
+	char return_message[256+1] = {0};
+	char feature_invoke[256+1] = {0};
+
+	uint8_t make_sysrepoctl_call = 0;
+	*output_cnt = 0;
+	for (size_t i = 0; i < input_cnt; i++)
+	{
+		rc = xpath_get_tail_node(input[i].xpath, &tail_node);
+		CHECK_RET_MSG(rc, cleanup, "get tail node error");
+
+		if (strcmp("module-name", tail_node) == 0)
+		{
+			yang_module_name = input[i].data.string_val;
+		}
+		else if (strcmp("feature-name", tail_node) == 0)
+		{
+			feature_name = input[i].data.string_val;
+		}
+		else if (strcmp("enable", tail_node) == 0)
+		{
+			enable_feature = 1;
+			make_sysrepoctl_call = 1;
+		}
+		else if (strcmp("disable", tail_node) == 0)
+		{
+			enable_feature = 0;
+			make_sysrepoctl_call = 1;
+		}
+
+		if (make_sysrepoctl_call == 1)
+		{
+			memset(feature_invoke, 0, 256+1);
+			memset(return_message, 0, 256+1);
+			memset(command, 0, 256+1);
+			if (enable_feature == 1)
+			{
+				sprintf(command, "sysrepoctl -e %s -m %s", feature_name, yang_module_name);
+			}
+			else
+			{
+				sprintf(command, "sysrepoctl -d %s -m %s", feature_name, yang_module_name);
+			}
+			src = system(command);
+			if (src == -1)
+			{
+				ERR("error while executing `system` command: %d", src);
+				rc = SR_ERR_INTERNAL;
+				goto cleanup;
+			}
+			else if (src == 0)
+			{
+				sprintf(return_message, "%s feature %s in module %s succeeded.",(enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name);
+			}
+			else
+			{
+				sprintf(return_message, "%s feature %s in module %s failed. Error: %d.", (enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name , src);
+			}
+			// create response
+
+			sprintf(feature_invoke, "%s %s", yang_module_name, feature_name);
+
+
+			rc = sr_realloc_values(count, count + 2, &return_values);
+			SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
+
+			rc = sr_val_build_xpath(&return_values[count], RPC_FEATURE_INVOCATION_XPATH, feature_invoke);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+
+			rc = sr_val_set_str_data(&return_values[count], SR_STRING_T, feature_invoke);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+
+			count++;
+
+			rc = sr_val_build_xpath(&return_values[count], RPC_FEATURE_RESPONSE_XPATH, feature_invoke);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+
+			rc = sr_val_set_str_data(&return_values[count], SR_STRING_T, return_message);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+
+			count++;
+			make_sysrepoctl_call = 0;
+		}
+		free(tail_node);
+		tail_node = NULL;
+	}
+
+	*output_cnt = count;
+	*output = return_values;
+
+	return rc;
+
+cleanup:
+	free(tail_node);
+	if (return_values != NULL) { sr_free_values(return_values, count); }
+	return rc;
+}
+
