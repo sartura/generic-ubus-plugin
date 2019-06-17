@@ -1,3 +1,7 @@
+//#include <sys/inotify.h>
+#include <stdlib.h>
+#include <regex.h>
+
 #include "context.h"
 
 int context_create(context_t **context)
@@ -167,7 +171,7 @@ cleanup:
 
 int context_delete_all_ubus_object(context_t *context)
 {
-     int rc = SR_ERR_OK;
+    int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     ubus_object_t *ubus_object_p = NULL;
     ubus_object_t *ubus_object_n = NULL;
@@ -181,6 +185,7 @@ cleanup:
     return rc;
 }
 
+// TODO: free inotify file descriptor
 void context_destroy(context_t **context)
 {
     if (*context != NULL)
@@ -211,6 +216,7 @@ void context_destroy(context_t **context)
             rc = sr_unsubscribe((*context)->session, (*context)->subscription);
             if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
         }
+/*
 #if PLUGIN
         if ((*context)->session != NULL)
         {
@@ -218,7 +224,100 @@ void context_destroy(context_t **context)
             if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
         }
 #endif
+*/
     }
     free(*context);
     *context = NULL;
+}
+/*
+// TODO: maybe redundant
+int context_init_ubus_object_filter(context_t *context)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+
+    int fd = -1;
+    int wd = -1;
+
+    fd = inotify_init1(IN_NONBLOCK);
+    if (fd == -1)
+    {
+        rc = SR_ERR_INTERNAL;
+        ERR_MSG("error initializing inotify file descriptor");
+    }
+
+    wd = inotify_add_watch(fd, WATCH_FILE, IN_DELETE_SELF | IN_CLOSE_WRITE);
+    if ( wd == -1)
+    {
+        rc = SR_ERR_INTERNAL;
+        ERR("can't watch file %s", WATCH_FILE);
+    }
+
+    context->inotify_fd = fd;
+    context->inotify_wd = wd;
+
+    return rc;
+
+cleanup:
+    if (fd != -1) { close(fd); }
+    return rc;
+}
+*/
+int context_filter_ubus_object(context_t *context, const char *ubus_object_name, bool *skip)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+    CHECK_NULL_MSG(ubus_object_name, &rc, cleanup, "input argument ubus_object_name is null");
+    *skip = false;
+
+    char file_ubus_object_name[256+1];
+    regex_t regular_expression;
+    int regrc = 0;
+
+    // TODO: maybe inotify is redundant?
+    FILE *fd = fopen(WATCH_FILE, "r");
+    if (fd == NULL)
+    {
+        rc = SR_ERR_INTERNAL;
+        ERR_MSG("error initializing inotify file descriptor");
+        return rc;
+    }
+
+    while(true)
+    {
+        memset(file_ubus_object_name, 0, 256+1);
+        int scanned_line = fscanf(fd, "%s\n", file_ubus_object_name);
+        if (scanned_line == EOF) { break; }
+
+        // TODO: replace with regex matching
+        regrc = regcomp(&regular_expression, file_ubus_object_name, 0);
+        if (regrc != 0)
+        {
+            rc = SR_ERR_INTERNAL;
+        }
+
+        regrc = regexec(&regular_expression, ubus_object_name, 0, NULL, 0);
+        if (regrc == 0) {
+            INF_MSG("regex match");
+            *skip = true;
+            regfree(&regular_expression);
+            break;
+        }
+        else if (regrc == REG_NOMATCH)
+        {
+            *skip = false;
+            INF_MSG("regex no match");
+        }
+        else
+        {
+            rc = SR_ERR_INTERNAL;
+            ERR("regexec error: %d", regrc);
+        }
+        regfree(&regular_expression);
+    }
+
+
+cleanup:
+    if (fd != NULL) { fclose(fd); }
+    return rc;
 }

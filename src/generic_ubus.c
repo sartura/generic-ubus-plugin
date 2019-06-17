@@ -514,6 +514,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
     size_t count = 0;
     sr_val_t *sysrepo_values = NULL;
     char *result_json_data = NULL;
+    static bool ubus_object_not_found = false;
 
     CHECK_NULL_MSG(cb_xpath, &rc, cleanup, "input argument cb_xpath is null");
     CHECK_NULL_MSG(values_cnt, &rc, cleanup, "input argument values_cnt is null");
@@ -526,6 +527,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
     {
         request = request_id;
         ubus_method_name = NULL;
+        ubus_object_not_found = false;
 
         // get the ubus object
         rc = xpath_get_module_name(cb_xpath, &module_name);
@@ -546,13 +548,29 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
                 break;
             }
         }
+
+        if (ubus_object == NULL)
+        {
+            goto cleanup;
+            ubus_object_not_found = true;
+        }
+
         rc = ubus_object_get_libyang_schema(ubus_object, &libyang_module);
         CHECK_RET_MSG(rc, cleanup, "get libyang module schema error");
     }
-    else if (ubus_method_name == NULL)
+    else if (ubus_method_name == NULL || ubus_object_not_found == false)
     {
         rc = xpath_get_module_name(original_xpath, &module_name);
         CHECK_RET_MSG(rc, cleanup, "get module name error");
+
+        rc = ubus_object_get_name(ubus_object, &ubus_object_name);
+        CHECK_RET_MSG(rc, cleanup, "get ubus object name error");
+
+        bool skip_ubus_object = false;
+        rc = context_filter_ubus_object(context, ubus_object_name, &skip_ubus_object);
+        CHECK_RET_MSG(rc, cleanup, "filter ubus object error");
+
+        if (skip_ubus_object == true) { goto cleanup; }
 
         root = lyd_new(NULL, libyang_module, module_name);
         CHECK_NULL_MSG(root, &rc, cleanup, "libyang data root node");
@@ -597,12 +615,12 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
 
         rc = ubus_method_get_message(ubus_method, &ubus_message);
         CHECK_RET_MSG(rc, cleanup, "ubus method get method message error");
-
+/*
         rc = ubus_object_get_name(ubus_object, &ubus_object_name);
         CHECK_RET_MSG(rc, cleanup, "ubus object get name error");
-
+*/
         result_json_data = NULL;
-        rc = ubus_call(ubus_object->name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+        rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
         CHECK_RET_MSG(rc, cleanup, "ubus call error");
 
         parsed_json = json_tokener_parse(result_json_data);
@@ -857,6 +875,8 @@ int generic_ubus_ubus_call_rpc_cb(const char *xpath, const sr_val_t *input, cons
 	size_t count = 0;
 	char ubus_invoke_string[256+1] = {0};
 	char *result_json_data = NULL;
+    context_t *context = (context_t *)private_ctx;
+    const char *ubus_object_filtered_out_message = "Ubus object is filtered out";
 
 	*output_cnt = 0;
 
@@ -884,9 +904,22 @@ int generic_ubus_ubus_call_rpc_cb(const char *xpath, const sr_val_t *input, cons
 
 		if ((strstr(tail_node, RPC_UBUS_INVOCATION) != NULL && ubus_method_name != NULL && ubus_object_name != NULL ) || last == 1)
 		{
+            bool skip_ubus_object = false;
+            rc = context_filter_ubus_object(context, ubus_object_name, &skip_ubus_object);
+            CHECK_RET_MSG(rc, cleanup, "filter ubus object error");
 
-			rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
-			CHECK_RET_MSG(rc, cleanup, "ubus call error");
+            INF("%d", skip_ubus_object);
+            if (skip_ubus_object == false)
+            {
+                rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+			    CHECK_RET_MSG(rc, cleanup, "ubus call error");
+            }
+            else
+            {
+                result_json_data = calloc(1, strlen(ubus_object_filtered_out_message)+1);
+                CHECK_NULL_MSG(result_json_data, &rc, cleanup, "result json data alloc error");
+                strcpy(result_json_data, ubus_object_filtered_out_message);
+            }
 
 			rc = sr_realloc_values(count, count + 2, &result);
 			SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));

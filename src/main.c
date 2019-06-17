@@ -52,7 +52,7 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
 	SR_CHECK_RET(rc, cleanup, "initialization error: %s", sr_strerror(rc));
 
 	INF_MSG("Subscribing to ubus call rpc");
-	rc = sr_rpc_subscribe(session, "/"YANG_MODEL":ubus-call", generic_ubus_ubus_call_rpc_cb, NULL, SR_SUBSCR_CTX_REUSE, &context->subscription);
+	rc = sr_rpc_subscribe(session, "/"YANG_MODEL":ubus-call", generic_ubus_ubus_call_rpc_cb, *private_ctx, SR_SUBSCR_CTX_REUSE, &context->subscription);
 	SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
 
 	INF_MSG("Subscribing to module install rpc");
