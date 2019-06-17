@@ -14,10 +14,6 @@ struct context_s {
 	sr_session_ctx_t *startup_session;			// session for a connection running DS
 	sr_conn_ctx_t *startup_connection;
 
-	// filtering support
-	int inotify_fd;
-	int inotify_wd; // 1 file tracking only 2 types of events
-
 	struct list_head ubus_object_list; // list of all registered ubus_objects
 };
 
@@ -43,10 +39,4 @@ void context_destroy(context_t **context);
 
 int context_filter_ubus_object(context_t *context, const char *ubus_object_name, bool *skip);
 
-// filter support
-/*
-int context_init_ubus_object_filter();
-int context_destroy_ubus_object_filter();
-int context_filter_ubus_object();
-*/
 #endif /* _CONTEXT_UBUS_H_ */

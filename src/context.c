@@ -185,7 +185,6 @@ cleanup:
     return rc;
 }
 
-// TODO: free inotify file descriptor
 void context_destroy(context_t **context)
 {
     if (*context != NULL)
@@ -229,40 +228,7 @@ void context_destroy(context_t **context)
     free(*context);
     *context = NULL;
 }
-/*
-// TODO: maybe redundant
-int context_init_ubus_object_filter(context_t *context)
-{
-    int rc = SR_ERR_OK;
-    CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
 
-    int fd = -1;
-    int wd = -1;
-
-    fd = inotify_init1(IN_NONBLOCK);
-    if (fd == -1)
-    {
-        rc = SR_ERR_INTERNAL;
-        ERR_MSG("error initializing inotify file descriptor");
-    }
-
-    wd = inotify_add_watch(fd, WATCH_FILE, IN_DELETE_SELF | IN_CLOSE_WRITE);
-    if ( wd == -1)
-    {
-        rc = SR_ERR_INTERNAL;
-        ERR("can't watch file %s", WATCH_FILE);
-    }
-
-    context->inotify_fd = fd;
-    context->inotify_wd = wd;
-
-    return rc;
-
-cleanup:
-    if (fd != -1) { close(fd); }
-    return rc;
-}
-*/
 int context_filter_ubus_object(context_t *context, const char *ubus_object_name, bool *skip)
 {
     int rc = SR_ERR_OK;
