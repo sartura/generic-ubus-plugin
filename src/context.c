@@ -275,7 +275,7 @@ int context_filter_ubus_object(context_t *context, const char *ubus_object_name,
     int regrc = 0;
 
     // TODO: maybe inotify is redundant?
-    FILE *fd = fopen(WATCH_FILE, "r");
+    FILE *fd = fopen(UBUS_OBJECT_FILTER_WATCH_FILE, "r");
     if (fd == NULL)
     {
         rc = SR_ERR_INTERNAL;

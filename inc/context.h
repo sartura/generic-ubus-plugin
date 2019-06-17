@@ -8,8 +8,6 @@
 
 #include "ubus_object.h"
 
-#define WATCH_FILE "/tmp/generic-ubus-object-ignore" // TODO: define with cmake
-
 struct context_s {
 	sr_session_ctx_t *session;			// session for a connection running DS
 	sr_subscription_ctx_t *subscription;	// subscription for generic-ubus
