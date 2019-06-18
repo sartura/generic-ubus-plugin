@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-const char *GIT_SHA1 = "GIT_SHA1_4ad4a60fe486c697b8dcd4bd5d8894d7c36fb40b";
+const char *GIT_SHA1 = "GIT_SHA1_1808691c8ffaa01b9cdb752185cbdd31a80ffca7";
 const char *COMPILED_SYSREPO_VERSION = "COMPILED_SYSREPO_VERSION_0.7.7";
 
 // check if Sysrepo < 0.7.5 is used
