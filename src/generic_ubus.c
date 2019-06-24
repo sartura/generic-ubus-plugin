@@ -1,8 +1,10 @@
 #include "generic_ubus.h"
 #include "xpath.h"
+
 #include "sysrepo/values.h"
 
 #include "libyang/tree_data.h"
+#include "libyang/tree_schema.h"
 
 #include "ubus_call.h"
 
@@ -28,7 +30,7 @@ static int generic_ubus_modify_ubus_method(context_t *context, sr_val_t *value);
 static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value);
 static int generic_ubus_set_context(context_t *context, sr_val_t *value);
 static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, const char *original_xpath, void *private_ctx);
-static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node, size_t *count);
+static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node);
 static int generic_ubus_set_sysrepo_data(struct lyd_node *root, sr_val_t **values, size_t *values_cnt);
 static int generic_ubus_libyang_to_sysrepo(struct lyd_node_leaf_list *node, sr_val_t *value);
 
@@ -551,14 +553,14 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
 
         if (ubus_object == NULL)
         {
-            goto cleanup;
             ubus_object_not_found = true;
+            goto cleanup;
         }
 
         rc = ubus_object_get_libyang_schema(ubus_object, &libyang_module);
         CHECK_RET_MSG(rc, cleanup, "get libyang module schema error");
     }
-    else if (ubus_method_name == NULL || ubus_object_not_found == false)
+    else if (ubus_method_name == NULL && ubus_object_not_found == false)
     {
         rc = xpath_get_module_name(original_xpath, &module_name);
         CHECK_RET_MSG(rc, cleanup, "get module name error");
@@ -593,7 +595,6 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
         {
             INF("uom_name: %s | uom_message: %s", ubus_method_it->name, ubus_method_it->message);
 
-            char *ubus_method_name = NULL;
             rc = ubus_method_get_name(ubus_method_it, &ubus_method_name);
             CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
 
@@ -602,17 +603,19 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
                 ubus_method = ubus_method_it;
                 break;
             }
+            ubus_method_name = NULL;
         }
 
         if (ubus_method == NULL)
         {
+            WRN("method %s not found for object %s", method_name, ubus_object_name);
             rc = SR_ERR_OK;
             goto cleanup;
         }
-
+/*
         rc = ubus_method_get_name(ubus_method, &ubus_method_name);
         CHECK_RET_MSG(rc, cleanup, "ubus method get method name error");
-
+*/
         rc = ubus_method_get_message(ubus_method, &ubus_message);
         CHECK_RET_MSG(rc, cleanup, "ubus method get method message error");
 /*
@@ -629,7 +632,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
         parent = lyd_new(root, libyang_module, ubus_method->name);
         CHECK_NULL_MSG(parent, &rc, cleanup, "libyang data root is null");
 
-        rc = generic_ubus_walk_json(parsed_json, libyang_module, parent, &count);
+        rc = generic_ubus_walk_json(parsed_json, libyang_module, parent);
         CHECK_RET_MSG(rc, cleanup, "generic ubus walk json error");
 
         // validate the libyang
@@ -639,7 +642,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
             sr_free_val(sysrepo_values);
             goto cleanup;
         }
-
+/*
         if (count == 0)
         {
             rc = SR_ERR_OK;
@@ -648,7 +651,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
 
         rc = sr_new_values(count, &sysrepo_values);
         SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
-
+*/
         rc = generic_ubus_set_sysrepo_data(root, &sysrepo_values, &count);
         if (rc != SR_ERR_OK)
         {
@@ -672,7 +675,7 @@ cleanup:
     return rc;
 }
 
-static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node, size_t *count)
+static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node)
 {
     struct lyd_node *new_node = NULL;
     int rc = SR_ERR_OK;
@@ -685,26 +688,34 @@ static int generic_ubus_walk_json(json_object *object, struct lys_module *module
             // create new container node
             new_node = lyd_new(node, module, key);
             CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
-            rc = generic_ubus_walk_json(value, module, new_node, count);
+            rc = generic_ubus_walk_json(value, module, new_node);
             CHECK_RET_MSG(rc, cleanup, "error while waking tree");
         }
         else if (type == json_type_array)
         {
-            //CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
             size_t json_array_length = json_object_array_length(value);
             for (size_t i = 0; i < json_array_length; i++)
             {
                 json_object *entry = json_object_array_get_idx(value, i);
-                new_node = lyd_new_leaf(node, module, key, json_object_get_string(entry));
-                CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new leaf error");
-                *count = *count + 1;
+                json_type type = json_object_get_type(entry);
+                if (type == json_type_array || type == json_type_object)
+                {
+                    new_node = lyd_new(node, module, key);
+                    CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
+                    rc = generic_ubus_walk_json(entry, module, new_node);
+                    CHECK_RET_MSG(rc, cleanup, "error while waking tree");
+                }
+                else
+                {
+                    new_node = lyd_new_leaf(node, module, key, json_object_get_string(entry));
+                    CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new leaf error");
+                }
             }
         }
         else
         {
             new_node = lyd_new_leaf(node, module, key, json_object_get_string(value));
             CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new leaf error");
-            *count = *count + 1;
         }
     }
 
@@ -712,7 +723,6 @@ static int generic_ubus_walk_json(json_object *object, struct lys_module *module
 
 cleanup:
     if (new_node != NULL) { lyd_free_withsiblings(new_node); }
-    *count = 0;
     return rc;
 }
 
@@ -721,13 +731,30 @@ static int generic_ubus_set_sysrepo_data(struct lyd_node *root, sr_val_t **value
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(root, &rc, cleanup, "input argument root is null");
     CHECK_NULL_MSG(values, &rc, cleanup, "input argument values is null");
-    CHECK_NULL_MSG(values_cnt, &rc, cleanup, "input argument values_cnt is null");
 
     // go through lyd_nodes and set values and update count
     char *node_xpath = NULL;
     struct lyd_node *node = NULL;
     struct lyd_node *next_node = NULL;
     size_t i = 0;
+    size_t cnt = 0;
+    LY_TREE_DFS_BEGIN(root, next_node, node)
+    {
+
+        if (node->schema->nodetype == LYS_LEAF || node->schema->nodetype == LYS_LEAFLIST)
+        {
+            struct lyd_node_leaf_list *leaf_node = (struct lyd_node_leaf_list *)node;
+            if (lys_is_key((const struct lys_node_leaf *)leaf_node->schema, NULL) == NULL)
+            {
+                cnt++;
+            }
+        }
+        LY_TREE_DFS_END(root, next_node, node)
+    }
+
+    rc = sr_new_values(cnt, values);
+    SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
+
     LY_TREE_DFS_BEGIN(root, next_node, node)
     {
 
@@ -737,25 +764,30 @@ static int generic_ubus_set_sysrepo_data(struct lyd_node *root, sr_val_t **value
         if (node->schema->nodetype == LYS_LEAF || node->schema->nodetype == LYS_LEAFLIST)
         {
             struct lyd_node_leaf_list *leaf_node = (struct lyd_node_leaf_list *)node;
-            rc = sr_val_set_xpath(&(*values)[i], node_xpath);
-            SR_CHECK_RET(rc, cleanup, "sr set xpath: %s", sr_strerror(rc));
+            if (lys_is_key((const struct lys_node_leaf *)leaf_node->schema, NULL) == NULL)
+            {
+                rc = sr_val_set_xpath(&(*values)[i], node_xpath);
+                SR_CHECK_RET(rc, cleanup, "sr set xpath: %s", sr_strerror(rc));
 
-            rc = generic_ubus_libyang_to_sysrepo(leaf_node, &(*values)[i]);
-            CHECK_RET_MSG(rc, cleanup, "libyang to sysrepo mapping error");
+                rc = generic_ubus_libyang_to_sysrepo(leaf_node, &(*values)[i]);
+                CHECK_RET_MSG(rc, cleanup, "libyang to sysrepo mapping error");
 
+                i++;
+            }
             INF("%s", node_xpath);
-            i++;
         }
         free(node_xpath);
         node_xpath = NULL;
         LY_TREE_DFS_END(root, next_node, node)
     }
 
+    *values_cnt = cnt;
     return rc;
 
 
 cleanup:
     free(node_xpath);
+    *values_cnt = 0;
     return rc;
 }
 
