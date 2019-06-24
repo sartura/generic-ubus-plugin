@@ -1,4 +1,7 @@
 //#include <sys/inotify.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <regex.h>
 
@@ -236,18 +239,26 @@ int context_filter_ubus_object(context_t *context, const char *ubus_object_name,
     CHECK_NULL_MSG(ubus_object_name, &rc, cleanup, "input argument ubus_object_name is null");
     *skip = false;
 
-    char file_ubus_object_name[256+1];
-    regex_t regular_expression;
-    int regrc = 0;
+    struct stat st;
+    int result = stat(UBUS_OBJECT_FILTER_WATCH_FILE, &st);
+    if (result != 0)
+    {
+        rc = SR_ERR_OK;
+        WRN("file %s does not exist, no filtering will be done", UBUS_OBJECT_FILTER_WATCH_FILE);
+        return rc;
+    }
 
-    // TODO: maybe inotify is redundant?
     FILE *fd = fopen(UBUS_OBJECT_FILTER_WATCH_FILE, "r");
     if (fd == NULL)
     {
         rc = SR_ERR_INTERNAL;
-        ERR_MSG("error initializing inotify file descriptor");
+        ERR("error opening file %s", UBUS_OBJECT_FILTER_WATCH_FILE);
         return rc;
     }
+
+    char file_ubus_object_name[256+1];
+    regex_t regular_expression;
+    int regrc = 0;
 
     while(true)
     {

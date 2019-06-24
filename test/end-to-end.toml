@@ -1,6 +1,6 @@
 ### Information for opening a SSH session to the device ###
 [login]
-    address = "192.168.1.1:830"
+    address = "127.0.0.1:830"
     username = "root"
     password = "root"
     enabled = true
@@ -19,7 +19,7 @@
                     <yang-module>router-wireless</yang-module>
                     <method>
                         <name>status</name>
-                        <message>{}</message>
+                        <message>{"vif":"wl0"}</message>
                     </method>
                 </ubus-object>
             </generic-ubus-config>
@@ -29,20 +29,331 @@
     XMLResponse = """<ok/>"""
 
 ### get the written config
-### delete the data
+[[test]]
+    XMLRequestBody = """
+    <get>
+        <filter  xmlns:router-wireless='https://terastream/ns/yang/router-wireless' type="xpath" select="/router-wireless:*">
+        </filter>
+    </get>
+    """
 
-### install all
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+        <router-wireless xmlns="https://terastream/ns/yang/router-wireless">
+            <status>
+                <wldev>wl0</wldev>
+                <radio>1</radio>
+                <ssid>PrintS</ssid>
+                <bssid>00:22:07:75:E7:AD</bssid>
+                <encryption>WPA2 PSK</encryption>
+                <frequency>5</frequency>
+                <channel>100</channel>
+                <bandwidth>80</bandwidth>
+                <noise>-83</noise>
+                <rate>2166</rate>
+            </status>
+        </router-wireless>
+    </data>
+    """
+
+### delete the data
+[[test]]
+    XMLRequestBody = """
+    <edit-config>
+        <target>
+            <running/>
+        </target>
+        <config xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
+            <generic-ubus-config xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+                <ubus-object xc:operation="delete">
+                    <name>router.wireless</name>
+                    <yang-module>router-wireless</yang-module>
+                    <method>
+                        <name>status</name>
+                        <message>{"vif":"wl0"}</message>
+                    </method>
+                </ubus-object>
+            </generic-ubus-config>
+        </config>
+    </edit-config>
+    """
+    XMLResponse = """<ok/>"""
+### set all
+[[test]]
+    XMLRequestBody = """
+    <edit-config>
+        <target>
+            <running/>
+        </target>
+        <config>
+            <generic-ubus-config xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+                <ubus-object>
+                    <name>router.wireless</name>
+                    <yang-module>router-wireless</yang-module>
+                    <method>
+                        <name>status</name>
+                        <message>{"vif":"wl0"}</message>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>sfp.ddm</name>
+                    <yang-module>sfp-ddm</yang-module>
+                    <method>
+                        <name>get-all</name>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>system</name>
+                    <yang-module>ubus-system</yang-module>
+                    <method>
+                        <name>board</name>
+                    </method>
+                </ubus-object>
+            </generic-ubus-config>
+        </config>
+    </edit-config>
+    """
+    XMLResponse = """<ok/>"""
 ### get all
-### delete all
+[[test]]
+    XMLRequestBody = """
+    <get>
+        <filter  xmlns:router-wireless='https://terastream/ns/yang/router-wireless' type="xpath" select="/router-wireless:router-wireless/status">
+        </filter>
+    </get>
+    """
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+        <router-wireless xmlns="https://terastream/ns/yang/router-wireless">
+            <status>
+                <wldev>wl0</wldev>
+                <radio>1</radio>
+                <ssid>PrintS</ssid>
+                <bssid>00:22:07:75:E7:AD</bssid>
+                <encryption>WPA2 PSK</encryption>
+                <frequency>5</frequency>
+                <channel>100</channel>
+                <bandwidth>80</bandwidth>
+                <noise>-83</noise>
+                <rate>2166</rate>
+            </status>
+        </router-wireless>
+    </data>
+    """
+
+[[test]]
+    XMLRequestBody = """
+    <get>
+        <filter  xmlns:sfp-ddm='https://terastream/ns/yang/sfp-ddm' type="xpath" select="/sfp-ddm:sfp-ddm/get-all">
+        </filter>
+    </get>
+    """
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+    </data>
+    """
+[[test]]
+    XMLRequestBody = """
+    <get>
+        <filter  xmlns:ubus-system='https://terastream/ns/yang/ubus-system' type="xpath" select="/ubus-system:ubus-system/board">
+        </filter>
+    </get>
+    """
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+        <ubus-system xmlns="https://terastream/ns/yang/ubus-system">
+            <board>
+                <kernel>4.1.38</kernel>
+                <hostname>Inteno</hostname>
+                <system>ARMv7 Processor rev 1 (v7l)</system>
+                <model>Broadcom BCM963138</model>
+                <board_name>brcm,bcm963138</board_name>
+                <release>
+                <distribution>LEDE</distribution>
+                <version>SNAPSHOT</version>
+                <revision>r0+6904-c1591ad</revision>
+                <codename>reboot</codename>
+                <target>iopsys-brcm63xx-arm/generic</target>
+                <description>LEDE Reboot SNAPSHOT r0+6904-c1591ad</description>
+                </release>
+            </board>
+        </ubus-system>
+    </data>
+    """
+### delete all - first delete only the method for each then every thing
+[[test]]
+    XMLRequestBody = """
+    <edit-config>
+        <target>
+            <running/>
+        </target>
+        <config xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
+            <generic-ubus-config xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+                <ubus-object>
+                    <name>router.wireless</name>
+                    <yang-module>router-wireless</yang-module>
+                    <method xc:operation="delete">
+                        <name>status</name>
+                        <message>{"vif":"wl0"}</message>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>sfp.ddm</name>
+                    <yang-module>sfp-ddm</yang-module>
+                    <method xc:operation="delete">
+                        <name>get-all</name>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>system</name>
+                    <yang-module>ubus-system</yang-module>
+                    <method xc:operation="delete">
+                        <name>board</name>
+                    </method>
+                </ubus-object>
+            </generic-ubus-config>
+        </config>
+    </edit-config>
+    """
+    XMLResponse = """<ok/>"""
+
+[[test]]
+    XMLRequestBody = """
+    <edit-config>
+        <target>
+            <running/>
+        </target>
+        <config xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
+            <generic-ubus-config xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+                <ubus-object xc:operation="delete">
+                    <name>router.wireless</name>
+                    <yang-module>router-wireless</yang-module>
+                </ubus-object>
+                <ubus-object xc:operation="delete">
+                    <name>sfp.ddm</name>
+                    <yang-module>sfp-ddm</yang-module>
+                </ubus-object>
+                <ubus-object xc:operation="delete">
+                    <name>system</name>
+                    <yang-module>ubus-system</yang-module>
+                </ubus-object>
+            </generic-ubus-config>
+        </config>
+    </edit-config>
+    """
+    XMLResponse = """<ok/>"""
 
 ### ubus call one
+[[test]]
+    XMLRequestBody = """
+    <ubus-call xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <ubus-invocation>
+            <ubus-object>router.wireless</ubus-object>
+            <ubus-method>status</ubus-method>
+            <ubus-method-message>{"vif":"wl0"}</ubus-method-message>
+        </ubus-invocation>
+    </ubus-call>
+    """
+    XMLResponse = """
+    <ubus-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <ubus-invocation>router.wireless status {"vif":"wl0"}</ubus-invocation>
+        <ubus-response>{"wldev":"wl0","radio":1,"ssid":"PANTERA-7666","bssid":"00:22:07:67:78:57","encryption":"WPA2 PSK","frequency":5,"channel":100,"bandwidth":80,"noise":-74,"rate":433}</ubus-response>
+    </ubus-result>
+    """
 ### ubus call multiple
+[[test]]
+    XMLRequestBody = """
+    <ubus-call xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <ubus-invocation>
+            <ubus-object>router.wireless</ubus-object>
+            <ubus-method>status</ubus-method>
+            <ubus-method-message>{"vif":"wl0"}</ubus-method-message>
+        </ubus-invocation>
+        <ubus-invocation>
+                <ubus-object>system</ubus-object>
+                <ubus-method>board</ubus-method>
+        </ubus-invocation>
+    </ubus-call>
+    """
+
+    XMLResponse = """
+    <ubus-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <ubus-invocation>router.wireless status {"vif":"wl0"}</ubus-invocation>
+        <ubus-response>{"wldev":"wl0","radio":1,"ssid":"PANTERA-7666","bssid":"00:22:07:67:78:57","encryption":"WPA2 PSK","frequency":5,"channel":100,"bandwidth":80,"noise":-74,"rate":433}</ubus-response>
+    </ubus-result>
+    <ubus-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+       <ubus-invocation>system board {}</ubus-invocation>
+        <ubus-response>{"kernel":"4.1.38","hostname":"Inteno","system":"ARMv7 Processor rev 1 (v7l)","model":"Broadcom BCM963138","board_name":"brcm,bcm963138","release":{"distribution":"LEDE","version":"SNAPSHOT","revision":"r5974-0413e94","codename":"reboot","target":"iopsys-brcm63xx-arm/generic","description":"LEDE Reboot SNAPSHOT r5974-0413e94"}}</ubus-response>
+    </ubus-result>
+    """
 
 ### module install one
+[[test]]
+    XMLRequestBody = """
+    <module-install xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/ubus-system@2019-06-18.yang</module-name-full>
+    </module-install>
+    """
+    XMLResponse = """
+    <module-install-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/ubus-system@2019-06-18.yang</module-name-full>
+        <module-install-status>Installation of module /etc/sysrepo/yang/ubus-system@2019-06-18.yang succeeded</module-install-status>
+    </module-install-result>
+    """
+
 ### module instal multiple
+[[test]]
+    XMLRequestBody = """
+    <module-install xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/ubus-system@2019-06-18.yang</module-name-full>
+        <module-name-full>/etc/sysrepo/yang/router-wireless@2019-06-04.yang</module-name-full>
+    </module-install>
+    """
+
+    XMLResponse = """
+    <module-install-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/ubus-system@2019-06-18.yang</module-name-full>
+        <module-install-status>Installation of module /etc/sysrepo/yang/ubus-system@2019-06-18.yang succeeded</module-install-status>
+    </module-install-result>
+    <module-install-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/router-wireless@2019-06-04.yang</module-name-full>
+        <module-install-status>Installation of module /etc/sysrepo/yang/router-wireless@2019-06-04.yang succeeded</module-install-status>
+    </module-install-result>
+    """
 
 ### feature enable - weather report just for me use other to test
-### feature enable multiple
+[[test]]
+    XMLRequestBody = """
+    <feature-update xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <feature-update-invocation>
+                <module-name>weather-report</module-name>
+                <feature-name>show-date-time</feature-name>
+                <enable/>
+        </feature-update-invocation>
+    </feature-update>
+    """
 
-### filter one do get all
-### filter all do get all
+    XMLResponse = """
+    <feature-update-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <feature-invocation-full>weather-report show-date-time</feature-invocation-full>
+        <feature-update-status>Enabeling feature show-date-time in module weather-report succeeded.</feature-update-status>
+    </feature-update-result>
+    """
+### feature enable multiple
+[[test]]
+    XMLRequestBody = """
+    <feature-update xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <feature-update-invocation>
+                <module-name>weather-report</module-name>
+                <feature-name>show-date-time</feature-name>
+                <disable/>
+        </feature-update-invocation>
+    </feature-update>
+    """
+
+    XMLResponse = """
+    <feature-update-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <feature-invocation-full>weather-report show-date-time</feature-invocation-full>
+        <feature-update-status>Disabeling feature show-date-time in module weather-report succeeded.</feature-update-status>
+    </feature-update-result>
+    """
