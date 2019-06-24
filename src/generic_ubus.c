@@ -497,7 +497,6 @@ cleanup:
     return;
 }
 
-// TODO: check this for bug with feature support
 static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, const char *original_xpath, void *private_ctx)
 {
     int rc = SR_ERR_OK;
@@ -516,7 +515,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
     size_t count = 0;
     sr_val_t *sysrepo_values = NULL;
     char *result_json_data = NULL;
-    static bool ubus_object_not_found = false;
+    //static bool ubus_object_not_found = false;
 
     CHECK_NULL_MSG(cb_xpath, &rc, cleanup, "input argument cb_xpath is null");
     CHECK_NULL_MSG(values_cnt, &rc, cleanup, "input argument values_cnt is null");
@@ -529,7 +528,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
     {
         request = request_id;
         ubus_method_name = NULL;
-        ubus_object_not_found = false;
+        //ubus_object_not_found = false;
 
         // get the ubus object
         rc = xpath_get_module_name(cb_xpath, &module_name);
@@ -537,6 +536,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
 
         // go through all ubus objects and find the one with the yang module
         ubus_object_t *ubus_object_it = NULL;
+        ubus_object = NULL;
         context_for_each_ubus_object(context, ubus_object_it)
         {
 
@@ -550,17 +550,17 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
                 break;
             }
         }
-
+/*
         if (ubus_object == NULL)
         {
             ubus_object_not_found = true;
             goto cleanup;
         }
-
+*/
         rc = ubus_object_get_libyang_schema(ubus_object, &libyang_module);
         CHECK_RET_MSG(rc, cleanup, "get libyang module schema error");
     }
-    else if (ubus_method_name == NULL && ubus_object_not_found == false)
+    else if (ubus_object != NULL)
     {
         rc = xpath_get_module_name(original_xpath, &module_name);
         CHECK_RET_MSG(rc, cleanup, "get module name error");
@@ -608,7 +608,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
 
         if (ubus_method == NULL)
         {
-            WRN("method %s not found for object %s", method_name, ubus_object_name);
+            INF("method %s not found for object %s", method_name, ubus_object_name);
             rc = SR_ERR_OK;
             goto cleanup;
         }
