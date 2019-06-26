@@ -1,10 +1,10 @@
 /**
- * @file snabb.h
+ * @file common.h
  * @author Mislav Novakovic <mislav.novakovic@sartur.hr>
  * @brief header file for macros.
  *
  * @copyright
- * Copyright (C) 2017 Deutsche Telekom AG.
+ * Copyright (C) 2019 Deutsche Telekom AG.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

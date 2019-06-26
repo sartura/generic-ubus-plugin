@@ -1,4 +1,31 @@
-//#include <sys/inotify.h>
+/*
+ * @file context.c
+ * @author Luka Paulic <luka.paulic@sartura.hr>
+ *
+ * @brief Implements getters and setters for the data inside the context_t
+ *        structure. Provides functions for retrieving and iterating
+ *        over ubus objects. Additionally implements a cleanup function for
+ *        releasing the context data from memory.
+ *
+ * @copyright
+ * Copyright (C) 2019 Deutsche Telekom AG.
+ *
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *	http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+/*================Includes====================================================*/
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -7,6 +34,16 @@
 
 #include "context.h"
 
+/*=========================Function definitions===============================*/
+
+/*
+ * @brief Function used for allocating the context_t structure.
+ *        Sets all pointers to NULL.
+ *
+ * @param[in/out] context structer pointer that will be allocated in memory.
+ *
+ * @return error code.
+*/
 int context_create(context_t **context)
 {
     int rc = SR_ERR_OK;
@@ -23,6 +60,15 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Setter method for the running session.
+ *
+ * @param[in] context context_t structure to be modified.
+ * @param[in] session running session context to be set.
+ *
+ * @return error code.
+ *
+*/
 int context_set_session(context_t *context, sr_session_ctx_t *session)
 {
     int rc = SR_ERR_OK;
@@ -35,6 +81,14 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Setter method for the subscriptions.
+ *
+ * @param[in] context context_t structure to be modified.
+ * @param[in] subscription subscription context to be set.
+ *
+ * @return error code.
+*/
 int context_set_subscription(context_t *context, sr_subscription_ctx_t *subscription)
 {
     int rc = SR_ERR_OK;
@@ -47,6 +101,14 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Setter method for the startup session.
+ *
+ * @param[in] context context_t structure to be modified.
+ * @param[in] session startup session context to be set.
+ *
+ * @return error code.
+*/
 int context_set_startup_session(context_t *context, sr_session_ctx_t *session)
 {
     int rc = SR_ERR_OK;
@@ -59,6 +121,14 @@ cleanup:
   return rc;
 }
 
+/*
+ * @brief Setter method for the startup connection.
+ *
+ * @param[in] context context_t structure to be modified.
+ * @param[in] connection startup connection context to be set.
+ *
+ * @return error code.
+*/
 int context_set_startup_connection(context_t *context, sr_conn_ctx_t *connection)
 {
     int rc = SR_ERR_OK;
@@ -71,6 +141,14 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Getter method for the running session.
+ *
+ * @param[in] context structure that holds the running session context.
+ * @param[out] session  current running session.
+ *
+ * @return error code.
+*/
 int context_get_session(context_t *context, sr_session_ctx_t **session)
 {
     int rc = SR_ERR_OK;
@@ -83,6 +161,14 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Getter method for the subscriptions.
+ *
+ * @param[in] context structure that holds the subscription context.
+ * @param[out] subscription  subscription for the current session.
+ *
+ * @return error code.
+*/
 int context_get_subscription(context_t *context, sr_subscription_ctx_t **subscription)
 {
     int rc = SR_ERR_OK;
@@ -94,6 +180,15 @@ int context_get_subscription(context_t *context, sr_subscription_ctx_t **subscri
 cleanup:
     return rc;
 }
+
+/*
+ * @brief Getter method for the startup session.
+ *
+ * @param[in] context structure that holds the startup session context.
+ * @param[out] session  current startup session.
+ *
+ * @return error code.
+*/
 int context_get_startup_session(context_t *context, sr_session_ctx_t **session)
 {
     int rc = SR_ERR_OK;
@@ -105,6 +200,15 @@ int context_get_startup_session(context_t *context, sr_session_ctx_t **session)
 cleanup:
   return rc;
 }
+
+/*
+ * @brief Getter method for the startup connection.
+ *
+ * @param[in] context structure that holds the startup connection context.
+ * @param[out] connection current startup connection.
+ *
+ * @return error code.
+*/
 int context_get_startup_connection(context_t *context, sr_conn_ctx_t **connection)
 {
     int rc = SR_ERR_OK;
@@ -117,6 +221,15 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Getter method for a ubus object.
+ *
+ * @param[in] context structure that holds the ubus object list.
+ * @param[out] ubus_object ubus object that was requested.
+ * @param[in] ubus_object_name name of the ubus_object to retrieve.
+ *
+ * @return error code.
+*/
 int context_get_ubus_object(context_t *context, ubus_object_t **ubus_object, const char *ubus_object_name)
 {
     int rc = SR_ERR_OK;
@@ -139,6 +252,14 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Adds an ubus object to the list of ubus objects.
+ *
+ * @param[in] context structure that holds the ubus object list.
+ * @param[in] ubus_object ubus object to be added to the list.
+ *
+ * @return error code.
+*/
 int context_add_ubus_object(context_t *context, ubus_object_t *ubus_object)
 {
     int rc = SR_ERR_OK;
@@ -151,6 +272,16 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Removes the ubus_object from the list. Unsubscribes to the YANG module
+ *        state data callback and releases the memory allocated
+ *        ubus_object.
+ *
+ * @param[in] context structure that holds the ubus object.
+ * @param[in] ubus_object ubus object to be deleted.
+ *
+ * @return error code.
+*/
 int context_delete_ubus_object(context_t *context, const char *ubus_object_name)
 {
     int rc = SR_ERR_OK;
@@ -172,6 +303,16 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Removes all ubus_object from the list. Unsubscribes to the YANG module
+ *        state data callback and releases the memory allocated
+ *        ubus_object.
+ *
+ * @param[in] context structure that holds the ubus object.
+ * @param[in] ubus_object ubus object to be deleted.
+ *
+ * @return error code.
+*/
 int context_delete_all_ubus_object(context_t *context)
 {
     int rc = SR_ERR_OK;
@@ -181,6 +322,10 @@ int context_delete_all_ubus_object(context_t *context)
     list_for_each_entry_safe(ubus_object_p, ubus_object_n, &context->ubus_object_list, list)
     {
         list_del(&ubus_object_p->list);
+
+        rc = ubus_object_unsubscribe(context->session, ubus_object_p);
+        CHECK_RET_MSG(rc, cleanup, "context unsubscribe ubus object error");
+
         ubus_object_destroy(&ubus_object_p);
     }
 
@@ -188,6 +333,15 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Deletes the context structure. Releases all the ubus objects from
+ *        memory. Closes the startup session and connection
+ *
+ * @param[in] context structure that holds the ubus object.
+ * @param[in] ubus_object ubus object to be deleted.
+ *
+ * @return error code.
+*/
 void context_destroy(context_t **context)
 {
     if (*context != NULL)
@@ -196,42 +350,38 @@ void context_destroy(context_t **context)
         if ((*context)->startup_session != NULL)
         {
             rc = sr_session_stop((*context)->startup_session);
-            if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
+            SR_CHECK_RET(rc, cleanup, "sr_session_stop: %s", sr_strerror(rc));
         }
         if ((*context)->startup_connection != NULL)
         {
             sr_disconnect((*context)->startup_connection);
         }
 
-        ubus_object_t *ubus_object = NULL;
-        list_for_each_entry(ubus_object, &(*context)->ubus_object_list, list)
-        {
-            rc = ubus_object_unsubscribe((*context)->session, ubus_object);
-            if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
-        }
-
         rc = context_delete_all_ubus_object(*context);
-        if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
+        CHECK_RET_MSG(rc, cleanup, "context_delete_all_ubus_object error");
 
         if ((*context)->subscription != NULL)
         {
             rc = sr_unsubscribe((*context)->session, (*context)->subscription);
-            if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
+            SR_CHECK_RET(rc, cleanup, "sr_unsubscribe: %s", sr_strerror(rc));
         }
-/*
-#if PLUGIN
-        if ((*context)->session != NULL)
-        {
-            rc = sr_session_stop((*context)->session);
-            if (rc != SR_ERR_OK) ERR("%s: %s", __func__, sr_strerror(rc)); // TODO: handle
-        }
-#endif
-*/
     }
+cleanup:
     free(*context);
     *context = NULL;
 }
 
+/*
+ * @brief Checks if the ubus object is listed in the ignore file. If so the
+ *        state data for the ubus object will not be shown.
+ *
+ * @param[in] context structure that holds the ubus object.
+ * @param[in] ubus_object_name name of the ubus object to be checked.
+ * @param[out] skip true if the ubus object is listed in the ignore file,
+ *             false otherwise.
+ *
+ * @return error code.
+*/
 int context_filter_ubus_object(context_t *context, const char *ubus_object_name, bool *skip)
 {
     int rc = SR_ERR_OK;
@@ -266,7 +416,6 @@ int context_filter_ubus_object(context_t *context, const char *ubus_object_name,
         int scanned_line = fscanf(fd, "%s\n", file_ubus_object_name);
         if (scanned_line == EOF) { break; }
 
-        // TODO: replace with regex matching
         regrc = regcomp(&regular_expression, file_ubus_object_name, 0);
         if (regrc != 0)
         {

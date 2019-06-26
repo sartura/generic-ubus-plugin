@@ -1,9 +1,33 @@
+/*
+ * @file generic_ubus.h
+ * @author Luka Paulic <luka.paulic@sartura.hr>
+ *
+ * @brief File contains defines and function prototype declarations that
+ *        implement the main logic for the generic-ubus plugin.
+ *
+ * @copyright
+ * Copyright (C) 2019 Deutsche Telekom AG.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *	http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
 #ifndef _GENERIC_UBUS_H_
 #define _GENERIC_UBUS_H_
 
+/*=========================Includes===========================================*/
 #include "context.h"
-// used for holding logic data and mapping between sysrepo and plugin
 
+/*========================Defines=============================================*/
 #define YANG_MODEL "terastream-generic-ubus"
 
 #define RPC_UBUS_OBJECT "ubus-object"
@@ -18,6 +42,7 @@
 #define RPC_FEATURE_RESPONSE_XPATH  "/terastream-generic-ubus:feature-update/feature-update-result[feature-invocation-full='%s']/feature-update-status"
 #define JSON_EMPTY_OBJECT "{}"
 
+/*=========================Function prototypes================================*/
 int generic_ubus_apply_module_changes(context_t *context, const char *module_name, sr_session_ctx_t *session);
 int generic_ubus_load_startup_datastore(context_t *context);
 void generic_ubus_feature_cb(const char *module_name, const char *feature_name, bool enabled, void *private_ctx);

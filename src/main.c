@@ -1,3 +1,30 @@
+/*
+ * @file main.c
+ * @author Luka Paulic <luka.paulic@sartura.hr>
+ *
+ * @brief Main function that supplies the plugin initialization and cleanup
+ * 		  functions. Additionally if the code is not compiled to run as a plugin
+ * 		  a main function for creating a session and connection to sysrepo
+ * 		  is supplied.
+ *
+ * @copyright
+ * Copyright (C) 2019 Deutsche Telekom AG.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *	http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+/*=========================Includes===========================================*/
 #include <stdio.h>
 #include <inttypes.h>
 #include <unistd.h>
@@ -9,14 +36,24 @@
 #include "context.h"
 #include "generic_ubus.h"
 #include "common.h"
-// #include "xpath.h"
 #include "ubus_call.h"
 
+/*=========================Function definitions===============================*/
 
-
+/*
+ * @brief Callback for initializing the plugin. Establishes a connection
+ *  	  to the startup datastore and syncs with the running data store.
+ * 		  Subscribes to generic ubus YANG module chagne, feature enable,
+ * 		  ubus call RPC and module install RPC.
+ *
+ * @param[in] session session context used for subscribiscions.
+ * @param[out] private_ctx context to be used in callback.
+ *
+ * @return error code.
+ *
+*/
 int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
 {
-	// TODO: add logic
 	INF("%s", __func__);
 
 	int rc = SR_ERR_OK;
@@ -66,17 +103,6 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
 	INF_MSG("Subscribing to feature change");
 	rc = sr_feature_enable_subscribe(session, generic_ubus_feature_cb, *private_ctx, SR_SUBSCR_CTX_REUSE, &context->subscription);
     SR_CHECK_RET(rc, cleanup, "feature subscription error: %s", sr_strerror(rc));
-/*
-	INF_MSG("Subscribing to operational");
-	rc = sr_dp_get_items_subscribe(session,
-								   "/terastream-wireless:devices-state",
-								   generic_ubus_operational_cb,
-								   *private_ctx,
-								   SR_SUBSCR_CTX_REUSE,
-								   &ctx->subscription);
-
-	SR_CHECK_RET(rc, error, "Error by sr_dp_get_items_subscribe: %s", sr_strerror(rc));
-*/
 
 	INF_MSG("Succesfull init");
 	return SR_ERR_OK;
@@ -86,6 +112,14 @@ cleanup:
 	return rc;
 }
 
+/*
+ * @brief Cleans the private context passed to the callbacks and unsubscribes
+ * 		  from all subscriptions.
+ *
+ * @param[in] session session context for unsubscribing.
+ * @param[in] private_ctx context to be released fro memory.
+ *
+*/
 void sr_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_ctx)
 {
 	INF("%s", __func__);
@@ -105,12 +139,26 @@ void sr_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_ctx)
 
 volatile int exit_application = 0;
 
+/*
+ * @brief Termination signal handeling
+ *
+ * @param[in] signum signal identifier.
+ *
+ * @note signum is not used.
+*/
 static void sigint_handler(__attribute__((unused)) int signum)
 {
 	INF_MSG("Sigint called, exiting...");
 	exit_application = 1;
 }
 
+/*
+ * @brief Initializes the connection to sysrepo and initializes the plugin.
+ * 		  When the program is interupted the cleanup code is called.
+ *
+ * @return error code.
+ *
+*/
 int main(void)
 {
 	INF_MSG("Plugin application mode initialized");

@@ -1,3 +1,35 @@
+/*
+ * @file generic_ubus.c
+ * @author Luka Paulic <luka.paulic@sartura.hr>
+ *
+ * @brief Implements tha main logic of the generic ubus plugin.
+ *        Main functionalities include:
+ *          + loading and syncing the startup data store withe the
+ *            running data store
+ *          + handeling creating, modifying, deleting the ubus object and
+ *            ubus method structures according to the configurational data
+ *            changes
+ *          + retreiving the YANG module state data for a ubus object
+ *            that is being monitored
+ *
+ * @copyright
+ * Copyright (C) 2019 Deutsche Telekom AG.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *	http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
+/*=========================Includes===========================================*/
 #include "generic_ubus.h"
 #include "xpath.h"
 
@@ -8,9 +40,11 @@
 
 #include "ubus_call.h"
 
+/*========================Defines=============================================*/
 #define YANG_UBUS_OBJECT "ubus-object"
 #define YANG_UBUS_METHOD "method"
 
+/*========================Enumeration=========================================*/
 enum generic_ubus_operation_e { UBUS_OBJECT_CREATE,
                                 UBUS_OBJECT_MODIFY,
                                 UBUS_OBJECT_DELETE,
@@ -19,8 +53,10 @@ enum generic_ubus_operation_e { UBUS_OBJECT_CREATE,
                                 UBUS_METHOD_DELETE,
                                 DO_NOTHING };
 
+/*===============================Type definition==============================*/
 typedef enum generic_ubus_operation_e generic_ubus_operation_t;
 
+/*=========================Function prototypes================================*/
 static generic_ubus_operation_t generic_ubus_get_operation(sr_change_oper_t operation, sr_val_t *old_value, sr_val_t *new_value);
 static int generic_ubus_create_ubus_object(context_t *context, sr_val_t *value);
 static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value);
@@ -34,13 +70,21 @@ static int generic_ubus_walk_json(json_object *object, struct lys_module *module
 static int generic_ubus_set_sysrepo_data(struct lyd_node *root, sr_val_t **values, size_t *values_cnt);
 static int generic_ubus_libyang_to_sysrepo(struct lyd_node_leaf_list *node, sr_val_t *value);
 
+/*=========================Function definitions===============================*/
+
+/*
+ * @brief Loads and sysncs the startup data store with the running data store
+ *        if the startup data store is not empty.
+ *
+ * @param[in] context structure holding the data store context's
+ *
+ * @return error code.
+*/
 int generic_ubus_load_startup_datastore(context_t *context)
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
 
-    // read from startup
-    // if NOT empty set the context
     sr_val_t *values = NULL;
     size_t count = 0;
     char *xpath = "/"YANG_MODEL":generic-ubus-config//*";
@@ -56,7 +100,6 @@ int generic_ubus_load_startup_datastore(context_t *context)
     INF("setting context data: %d", count);
     for (size_t i = 0; i < count; i++)
     {
-        // TODO: possible rewrite because of RPC support
         generic_ubus_set_context(context, &(values[i]));
     }
 
@@ -67,6 +110,16 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Syncs the configurational changes in the sysrepo running data store
+ *        with the context structure.
+ *
+ * @param[in] context structure tha holds all necessary plugin data.
+ * @param[in] module_name name of the YANG module that has new chagnes.
+ * @param[in] session sysrepo session with the module chagnes.
+ *
+ * @return error code.
+*/
 int generic_ubus_apply_module_changes(context_t *context, const char *module_name, sr_session_ctx_t *session)
 {
     int rc = SR_ERR_OK;
@@ -74,7 +127,7 @@ int generic_ubus_apply_module_changes(context_t *context, const char *module_nam
     sr_change_iter_t *it = NULL;
     sr_val_t *old_value = NULL;
     sr_val_t *new_value = NULL;
-    //sr_session_ctx_t *session = context->session;
+
     char xpath[256+1] = {0};
 
     snprintf(xpath, strlen(module_name) + 4, "/%s:*", module_name);
@@ -134,11 +187,22 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Determine the generic ubus operation using the sysrepo operation and
+ *        new and old values.
+ *
+ * @param[in] operation sysrepo operation for the current module chagne.
+ * @param[in] old_value sysrepo old data store value.
+ * @param[in] new_value sysrepo new data store value.
+ *
+ * @note old_value and new_value can be NULL.
+ *
+ * @return error code.
+*/
 static generic_ubus_operation_t generic_ubus_get_operation(sr_change_oper_t operation, sr_val_t *old_value, sr_val_t *new_value)
 {
     generic_ubus_operation_t plugin_operation = DO_NOTHING;
 
-    // test the ending of the xpath for new_value or old_value
     char *tail_node = NULL;
     const char *xpath = (new_value != NULL) ? new_value->xpath : ((old_value != NULL) ? old_value->xpath : NULL);
     int rc = 0;
@@ -181,9 +245,16 @@ cleanup:
     return plugin_operation;
 }
 
+/*
+ * @brief Procedure for creating an ubus_object structure.
+ *
+ * @param[in] context context for holding the ubus object
+ * @param[in] value sysrepo value containing the ubus object information.
+ *
+ * @return error code.
+*/
 static int generic_ubus_create_ubus_object(context_t *context, sr_val_t *value)
 {
-    // create an ubus_object
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
@@ -192,7 +263,6 @@ static int generic_ubus_create_ubus_object(context_t *context, sr_val_t *value)
     rc = ubus_object_create(&ubus_object);
     CHECK_RET_MSG(rc, cleanup, "allocation ubus_object is null");
 
-    // get the name from xpath and set
     char *key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
@@ -200,7 +270,6 @@ static int generic_ubus_create_ubus_object(context_t *context, sr_val_t *value)
     rc = ubus_object_set_name(ubus_object, key);
     CHECK_RET_MSG(rc, cleanup, "set ubus object name error");
 
-    // add to context list
     rc = context_add_ubus_object(context, ubus_object);
     CHECK_RET_MSG(rc, cleanup, "add ubus object to list error");
 
@@ -213,14 +282,23 @@ cleanup:
     return rc;
 }
 
-// if yang module changes unsubscribe from current and subscribe to next
+/*
+ * @brief Procedure for modifing an ubus_object structure.
+ *
+ * @param[in] context context for holding the ubus object
+ * @param[in] value sysrepo value containing the ubus object information.
+ *
+ * @note According to the generic ubus YANG module only the yang-module leaf
+ *       node can be modifed.
+ *
+ * @return error code.
+*/
 static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value)
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-    // get the name from xpath and set
     char *key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
@@ -243,10 +321,7 @@ static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value)
 
         rc = ubus_object_state_data_subscribe(context->session, (void *)context, ubus_object, generic_ubus_operational_cb);
         CHECK_RET_MSG(rc, cleanup, "module change subscribe error");
-/*
-        rc = ubus_object_feature_enable_subscribe(context->session, (void *)context, ubus_object, generic_ubus_feature_cb);
-        CHECK_RET_MSG(rc, cleanup, "feature subscribe error");
-*/
+
         rc = ubus_object_init_libyang_data(ubus_object, context->session);
         CHECK_RET_MSG(rc, cleanup, "init libyang context error");
     }
@@ -259,6 +334,15 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Procedure for deleting an ubus_object structure.
+ *
+ * @param[in] context context for holding the ubus object
+ * @param[in] value sysrepo value containing the ubus object information.
+ *
+ *
+ * @return error code.
+*/
 static int generic_ubus_delete_ubus_object(context_t *context, sr_val_t *value)
 {
     int rc = SR_ERR_OK;
@@ -282,29 +366,34 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Procedure for creating an ubus_method structure.
+ *
+ * @param[in] context context for holding the ubus object and ubus method.
+ * @param[in] value sysrepo value containing the ubus method information.
+ *
+ *
+ * @return error code.
+*/
 static int generic_ubus_create_ubus_method(context_t *context, sr_val_t *value)
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-    // get the name of ubus_object
     char *key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-    // get the ubus object
     ubus_object_t *ubus_object = NULL;
     rc = context_get_ubus_object(context, &ubus_object, key);
     CHECK_RET_MSG(rc, cleanup, "get ubus object error");
 
-    // get the name of ubus method
     free(key);
     key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-    // create the ubus method
     ubus_method_t *ubus_method = NULL;
     rc = ubus_method_create(&ubus_method);
     CHECK_RET_MSG(rc, cleanup, "allocation ubus_method is null");
@@ -312,7 +401,6 @@ static int generic_ubus_create_ubus_method(context_t *context, sr_val_t *value)
     rc = ubus_method_set_name(ubus_method, key);
     CHECK_RET_MSG(rc, cleanup, "set ubus method name error");
 
-    // add the ubus method to ubus object list
     rc = ubus_object_add_method(ubus_object, ubus_method);
     CHECK_RET_MSG(rc, cleanup, "add ubus method to list error");
 
@@ -325,29 +413,36 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Procedure for modifing an ubus_method structure.
+ *
+ * @param[in] context context for holding the ubus object and ubus method.
+ * @param[in] value sysrepo value containing the ubus method information.
+ *
+ * @note According to the generic ubus YANG module only the message leaf can
+ *       be modified.
+ *
+ * @return error code.
+*/
 static int generic_ubus_modify_ubus_method(context_t *context, sr_val_t *value)
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-    // get the name of ubus_object
     char *key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-    // get the ubus object
     ubus_object_t *ubus_object = NULL;
     rc = context_get_ubus_object(context, &ubus_object, key);
     CHECK_RET_MSG(rc, cleanup, "get ubus object error");
 
-    // get the name of ubus method
     free(key);
     key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-    // get ubus method
     ubus_method_t *ubus_method = NULL;
     rc = ubus_object_get_method(ubus_object, &ubus_method, key);
     CHECK_RET_MSG(rc, cleanup, "get ubus method error");
@@ -367,29 +462,34 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Procedure for deleting an ubus_method structure.
+ *
+ * @param[in] context context for holding the ubus object and ubus method.
+ * @param[in] value sysrepo value containing the ubus method information.
+ *
+ *
+ * @return error code.
+*/
 static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value)
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-    // get the name of ubus_object
     char *key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-    // get the ubus object
     ubus_object_t *ubus_object = NULL;
     rc = context_get_ubus_object(context, &ubus_object, key);
     CHECK_RET_MSG(rc, cleanup, "get ubus object error");
 
-    // get the name of ubus method
     free(key);
     key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-    // get ubus method
     ubus_method_t *ubus_method = NULL;
     rc = ubus_object_get_method(ubus_object, &ubus_method, key);
     CHECK_RET_MSG(rc, cleanup, "get ubus method error");
@@ -405,13 +505,21 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Main function determineting the generic ubus operation according to
+ *        the sysrepo value
+ *
+ * @param[in] context holding the ubus object and ubus method objects.
+ * @param[in] value sysrepo value containing the change.
+ *
+ * @return error code.
+*/
 static int generic_ubus_set_context(context_t *context, sr_val_t *value)
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-    // check the xpath
     char *tail_node = NULL;
     char *key = NULL;
     ubus_object_t *ubus_object = NULL;
@@ -447,7 +555,6 @@ static int generic_ubus_set_context(context_t *context, sr_val_t *value)
     }
     else
     {
-        // something is wrong or is it tam tam tam
         INF_MSG("ignoring the sysrepo value");
     }
 
@@ -463,6 +570,19 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Callback function for enabeling/disabeling features in YANG modules
+ *
+ * @param[in] module_name name of the module for which a feature is
+ *                        beeing updated.
+ * @param[in] feature_name name of the feature that is being updated.
+ * @param[in] enabled true if the feature is enabled, false otherwise.
+ * @param[in] private_ctx context tha is beeing passed to the callback
+ *
+ * @note features will be update only for the modules tracked by the generic
+ *       ubus plugin.
+ *
+*/
 void generic_ubus_feature_cb(const char *module_name, const char *feature_name, bool enabled, void *private_ctx)
 {
     int rc = SR_ERR_OK;
@@ -497,6 +617,17 @@ cleanup:
     return;
 }
 
+/*
+ * @brief Callback for gathering ubus state data for a specific ubus YANG module
+ *        that is being tracked according to the generic ubus YANG module.
+ *
+ * @param[in] cb_xpath xpath for the current element.
+ * @param[out] values  array of sysrepo values that are set (value anf xpath).
+ * @param[out] values_cnt number of values that are set.
+ * @param[in] request_id request id for a single module.
+ * @param[in] original_xpath original xpath entered by the user.
+ * @param[in] private_ctx context beeing passed to the callback.
+*/
 static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, size_t *values_cnt, uint64_t request_id, const char *original_xpath, void *private_ctx)
 {
     int rc = SR_ERR_OK;
@@ -515,7 +646,6 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
     size_t count = 0;
     sr_val_t *sysrepo_values = NULL;
     char *result_json_data = NULL;
-    //static bool ubus_object_not_found = false;
 
     CHECK_NULL_MSG(cb_xpath, &rc, cleanup, "input argument cb_xpath is null");
     CHECK_NULL_MSG(values_cnt, &rc, cleanup, "input argument values_cnt is null");
@@ -528,19 +658,14 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
     {
         request = request_id;
         ubus_method_name = NULL;
-        //ubus_object_not_found = false;
 
-        // get the ubus object
         rc = xpath_get_module_name(cb_xpath, &module_name);
         CHECK_RET_MSG(rc, cleanup, "get module name error");
 
-        // go through all ubus objects and find the one with the yang module
         ubus_object_t *ubus_object_it = NULL;
         ubus_object = NULL;
         context_for_each_ubus_object(context, ubus_object_it)
         {
-
-            // compare the requested yang module  and ubus object yang module
             char *yang_module = NULL;
             rc = ubus_object_get_yang_module(ubus_object_it, &yang_module);
             CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
@@ -550,13 +675,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
                 break;
             }
         }
-/*
-        if (ubus_object == NULL)
-        {
-            ubus_object_not_found = true;
-            goto cleanup;
-        }
-*/
+
         rc = ubus_object_get_libyang_schema(ubus_object, &libyang_module);
         CHECK_RET_MSG(rc, cleanup, "get libyang module schema error");
     }
@@ -587,8 +706,6 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
             goto cleanup;
         }
 
-        INF("%s", method_name);
-
         ubus_method_t *ubus_method_it = NULL;
         ubus_method_t *ubus_method = NULL;
         ubus_object_for_each_ubus_method(ubus_object, ubus_method_it)
@@ -612,16 +729,10 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
             rc = SR_ERR_OK;
             goto cleanup;
         }
-/*
-        rc = ubus_method_get_name(ubus_method, &ubus_method_name);
-        CHECK_RET_MSG(rc, cleanup, "ubus method get method name error");
-*/
+
         rc = ubus_method_get_message(ubus_method, &ubus_message);
         CHECK_RET_MSG(rc, cleanup, "ubus method get method message error");
-/*
-        rc = ubus_object_get_name(ubus_object, &ubus_object_name);
-        CHECK_RET_MSG(rc, cleanup, "ubus object get name error");
-*/
+
         result_json_data = NULL;
         rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
         CHECK_RET_MSG(rc, cleanup, "ubus call error");
@@ -635,23 +746,13 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
         rc = generic_ubus_walk_json(parsed_json, libyang_module, parent);
         CHECK_RET_MSG(rc, cleanup, "generic ubus walk json error");
 
-        // validate the libyang
         if (lyd_validate(&root, LYD_OPT_DATA_NO_YANGLIB, NULL) != 0)
         {
             ERR_MSG("error while validating libyang data tree");
             sr_free_val(sysrepo_values);
             goto cleanup;
         }
-/*
-        if (count == 0)
-        {
-            rc = SR_ERR_OK;
-            goto cleanup;
-        }
 
-        rc = sr_new_values(count, &sysrepo_values);
-        SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
-*/
         rc = generic_ubus_set_sysrepo_data(root, &sysrepo_values, &count);
         if (rc != SR_ERR_OK)
         {
@@ -675,6 +776,27 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Walks thorugh the ubus call response JSON data tree and
+ *        creates equivelent YANG data tree using predefined converting
+ *        rules:
+ *          JSON                                |           YANG
+ *         -------------------------------------------------------
+ *          string                              |   leaf
+ *          number                              |   leaf
+ *          boolean                             |   leaf
+ *          array of {string, number, boolean}  |   leaf-list
+ *          array of {arraym, object}           |   list
+ *          object                              |   container\
+ *
+ * @param[in] object json object hodling the data.
+ * @param[in] module libyang structure for describing the YANG data model.
+ * @param[in] node libyang node that is the root of the tree or subtree.
+ *
+ * @note Function is recursive.
+ *
+ * @return error code.
+*/
 static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node)
 {
     struct lyd_node *new_node = NULL;
@@ -685,7 +807,6 @@ static int generic_ubus_walk_json(json_object *object, struct lys_module *module
         json_type type = json_object_get_type(value);
         if ( type == json_type_object)
         {
-            // create new container node
             new_node = lyd_new(node, module, key);
             CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
             rc = generic_ubus_walk_json(value, module, new_node);
@@ -726,13 +847,22 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Converts the libyang data that has been gatherd from the
+ *        JSON data tree to the sysrepo data types and values.
+ *
+ * @param[in] root root libyang node representing the YANG data tree,
+ * @param[out] values sysrepo values to be set.
+ * @param[out] values_cnt number of values set.
+ *
+ * @return error code.
+*/
 static int generic_ubus_set_sysrepo_data(struct lyd_node *root, sr_val_t **values, size_t *values_cnt)
 {
     int rc = SR_ERR_OK;
     CHECK_NULL_MSG(root, &rc, cleanup, "input argument root is null");
     CHECK_NULL_MSG(values, &rc, cleanup, "input argument values is null");
 
-    // go through lyd_nodes and set values and update count
     char *node_xpath = NULL;
     struct lyd_node *node = NULL;
     struct lyd_node *next_node = NULL;
@@ -791,6 +921,14 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Converting libyang data types to sysrepo data types.
+ *
+ * @param[in] node libyang leaf node that is being converted to sysrepo value.
+ * @param[out] value sysrepo value being set from the libyang node.
+ *
+ * @return error code.
+*/
 static int generic_ubus_libyang_to_sysrepo(struct lyd_node_leaf_list *node, sr_val_t *value)
 {
     int rc = SR_ERR_OK;
@@ -874,6 +1012,18 @@ cleanup:
     return rc;
 }
 
+/*
+ * @brief Callback function for handeling configuration data changes for the
+ *        generic ubus YANG module.
+ *
+ * @param[in] session automatically created session used for getting module
+ *                    changes. This session must not be stopped.
+ * @param[in] module_name module that has changed.
+ * @param[in] event sysrepo notification event
+ * @param[in] private_ctx context that is being passed to the callback
+ *
+ * @return error code.
+*/
 int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name, sr_notif_event_t event, void *private_ctx)
 {
 	int rc = SR_ERR_OK;
@@ -896,6 +1046,19 @@ int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name, s
 	return rc;
 }
 
+/*
+ * @brief Callback for ubus call RPC method. Used to invoke an ubus call and
+ *        retreive ubus call result data.
+ *
+ * @param[in] xpath xpath to the module RPC.
+ * @param[in] input sysrepo RPC input data.
+ * @param[in] input_cnt number of input data.
+ * @param[out] output sysrepo RPC output data to be set.
+ * @param[out] output_cnt number of output data.
+ * @param[in] private_ctx context being passed to the callback function.
+ *
+ * @return error code.
+*/
 int generic_ubus_ubus_call_rpc_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
 {
 	int rc = SR_ERR_OK;
@@ -1005,6 +1168,20 @@ cleanup:
 	return rc;
 }
 
+/*
+ * @brief Callback for module install RPC. Used to install modules in sysrepo.
+ *
+ * @param[in] xpath xpath to the module RPC.
+ * @param[in] input sysrepo RPC input data.
+ * @param[in] input_cnt number of input data.
+ * @param[out] output sysrepo RPC output data to be set.
+ * @param[out] output_cnt number of output data.
+ * @param[in] private_ctx context being passed to the callback function.
+ *
+ * @note 'system' call is being used to invoke sysrepoctl command
+ *
+ * @return error code.
+*/
 int generic_ubus_module_install_rpc_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
 {
 	int rc = SR_ERR_OK;
@@ -1015,8 +1192,6 @@ int generic_ubus_module_install_rpc_cb(const char *xpath, const sr_val_t *input,
 	sr_val_t *return_values = NULL;
 	size_t count = 0;
 
-
-	// get module name (path included)
 	*output_cnt = 0;
 	for (size_t i = 0; i < input_cnt; i++)
 	{
@@ -1027,7 +1202,7 @@ int generic_ubus_module_install_rpc_cb(const char *xpath, const sr_val_t *input,
 		INF("%s", path_to_module);
 
 		sprintf(command, "sysrepoctl -i -g %s", path_to_module);
-		// fork ?
+
 		src = system(command);
 		if (src == -1)
 		{
@@ -1069,6 +1244,20 @@ cleanup:
 	return rc;
 }
 
+/*
+ * @brief Callback for feature enable/disable RPC.
+ *
+ * @param[in] xpath xpath to the module RPC.
+ * @param[in] input sysrepo RPC input data.
+ * @param[in] input_cnt number of input data.
+ * @param[out] output sysrepo RPC output data to be set.
+ * @param[out] output_cnt number of output data.
+ * @param[in] private_ctx context being passed to the callback function.
+ *
+ * @note 'system' call is being used to invoke sysrepoctl command
+ *
+ * @return error code.
+*/
 int generic_ubus_feature_update_rpc_cb(const char *xpath, const sr_val_t *input, const size_t input_cnt, sr_val_t **output, size_t *output_cnt, void *private_ctx)
 {
 	int rc = SR_ERR_OK;
@@ -1138,7 +1327,6 @@ int generic_ubus_feature_update_rpc_cb(const char *xpath, const sr_val_t *input,
 			{
 				sprintf(return_message, "%s feature %s in module %s failed. Error: %d.", (enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name , src);
 			}
-			// create response
 
 			sprintf(feature_invoke, "%s %s", yang_module_name, feature_name);
 

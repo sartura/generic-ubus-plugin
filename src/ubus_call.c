@@ -1,7 +1,40 @@
+/*
+ * @file ubus_call.c
+ * @author Luka Paulic <luka.paulic@sartura.hr>
+ *
+ * @brief Supplies function for invoking ubus calls using libubus.
+ *
+ * @copyright
+ * Copyright (C) 2019 Deutsche Telekom AG.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *	http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
 
+/*=========================Includes===========================================*/
 #include "ubus_call.h"
 #include "common.h"
 
+/*=========================Function definitions===============================*/
+
+/*
+ * @brief Callback function for retrieving ubus response data.
+ *
+ * @param[in] req ubus request structure holds the variable to get the result.
+ * @param[in] type ubus type, not used.
+ * @param[in] msg result message in blob_attr format.
+ *
+*/
 void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg)
 {
 
@@ -22,7 +55,20 @@ cleanup:
     return;
 }
 
-// TODO: replace current calls with this and test
+/*
+ * @brief Makes ubus calls and retrieves the result.
+ *
+ * @param[in] ubus_object_name name of the ubus object (aka. ubus path)
+ *                             for which a method is invoked.
+ * @param[in] ubus_method_name name of the method of a ubus object to be called.
+ * @param[in] ubus_message message of the method to be invoked.
+ * @param[in] f function pointer to register as a ubus callback function.
+ * @param[out] result holds the ubus method respons data.
+ *
+ * @note ubus_message can be NULL.
+ *
+ * @return error code.
+*/
 int ubus_call(const char *ubus_object_name, const char *ubus_method_name, const char *ubus_message, void(*f)(struct ubus_request *, int, struct blob_attr *), char **result)
 {
     int rc = SR_ERR_OK;
