@@ -14,7 +14,7 @@ retrieve the ubus data and present them as sysrepo state data. Every ubus object
 that is listed in the generic ubus YANG model should have its own YANG module
 that describes the resulting data and how it should be presented. For more
 information on how to write a ubus-specific YANG module follow the link:
-[How to write ubus-specific YANG module]().<!-- TODO add the link to the repo-->
+[How to write ubus-specific YANG module](https://github.com/sartura/generic-ubus-yang-modules).
 
 The state data is previewed when a NETCONF `get` request is issued on YANG module
 for a given ubus object according to its YANG module definition.
@@ -30,7 +30,7 @@ Detailed description of the RPC calls, how to issue them and RPC responses are
 provided in the following sections.
 
 Test example data is provided in the plugin. For detailed explanation, read the
-dedicated test [README.md]() <!-- TODO add the link -->
+dedicated test README.md
 
 # Configuration xml
 This section focuses on the generic ubus plugin YANG module. An explanation of
