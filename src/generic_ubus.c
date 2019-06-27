@@ -786,8 +786,8 @@ cleanup:
  *          number                              |   leaf
  *          boolean                             |   leaf
  *          array of {string, number, boolean}  |   leaf-list
- *          array of {arraym, object}           |   list
- *          object                              |   container\
+ *          array of {array, object}            |   list
+ *          object                              |   container
  *
  * @param[in] object json object hodling the data.
  * @param[in] module libyang structure for describing the YANG data model.
