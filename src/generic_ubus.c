@@ -1120,16 +1120,13 @@ int generic_ubus_ubus_call_rpc_cb(const char *xpath, const sr_val_t *input, cons
 			SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
 
 			memset(ubus_invoke_string, 0, 256+1);
-			int len = strlen(ubus_object_name) + strlen(ubus_method_name) + 2;
 			if (ubus_message != NULL)
 			{
-				len += (strlen(ubus_message) + 1);
-				snprintf(ubus_invoke_string, len, "%s %s %s", ubus_object_name, ubus_method_name, ubus_message);
+				snprintf(ubus_invoke_string, 256+1, "%s %s %s", ubus_object_name, ubus_method_name, ubus_message);
 			}
 			else
 			{
-				len += (4 + 1);
-				snprintf(ubus_invoke_string, len, "%s %s %s", ubus_object_name, ubus_method_name, JSON_EMPTY_OBJECT);
+				snprintf(ubus_invoke_string, 256+1, "%s %s %s", ubus_object_name, ubus_method_name, JSON_EMPTY_OBJECT);
 			}
 
 			rc = sr_val_build_xpath(&result[count], RPC_UBUS_INVOCATION_XPATH, ubus_invoke_string);
@@ -1201,7 +1198,7 @@ int generic_ubus_module_install_rpc_cb(const char *xpath, const sr_val_t *input,
 		path_to_module = input[i].data.string_val;
 		INF("%s", path_to_module);
 
-		sprintf(command, "sysrepoctl -i -g %s", path_to_module);
+		snprintf(command, 256+1, "sysrepoctl -i -g %s", path_to_module);
 
 		src = system(command);
 		if (src == -1)
@@ -1212,11 +1209,11 @@ int generic_ubus_module_install_rpc_cb(const char *xpath, const sr_val_t *input,
 		}
 		else if (src == 0)
 		{
-			sprintf(return_message, "Installation of module %s succeeded", path_to_module);
+			snprintf(return_message, 256+1, "Installation of module %s succeeded", path_to_module);
 		}
 		else
 		{
-			sprintf(return_message, "Installation of module %s failed, error: %d", path_to_module, src);
+			snprintf(return_message, 256+1, "Installation of module %s failed, error: %d", path_to_module, src);
 		}
 		rc = sr_realloc_values(count, count + 2, &return_values);
 		SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
@@ -1306,11 +1303,11 @@ int generic_ubus_feature_update_rpc_cb(const char *xpath, const sr_val_t *input,
 			memset(command, 0, 256+1);
 			if (enable_feature == 1)
 			{
-				sprintf(command, "sysrepoctl -e %s -m %s", feature_name, yang_module_name);
+				snprintf(command, 256+1, "sysrepoctl -e %s -m %s", feature_name, yang_module_name);
 			}
 			else
 			{
-				sprintf(command, "sysrepoctl -d %s -m %s", feature_name, yang_module_name);
+				snprintf(command, 256+1, "sysrepoctl -d %s -m %s", feature_name, yang_module_name);
 			}
 			src = system(command);
 			if (src == -1)
@@ -1321,14 +1318,14 @@ int generic_ubus_feature_update_rpc_cb(const char *xpath, const sr_val_t *input,
 			}
 			else if (src == 0)
 			{
-				sprintf(return_message, "%s feature %s in module %s succeeded.",(enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name);
+				snprintf(return_message, 256+1, "%s feature %s in module %s succeeded.",(enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name);
 			}
 			else
 			{
-				sprintf(return_message, "%s feature %s in module %s failed. Error: %d.", (enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name , src);
+				snprintf(return_message, 256+1, "%s feature %s in module %s failed. Error: %d.", (enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name , src);
 			}
 
-			sprintf(feature_invoke, "%s %s", yang_module_name, feature_name);
+			snprintf(feature_invoke, 256+1, "%s %s", yang_module_name, feature_name);
 
 
 			rc = sr_realloc_values(count, count + 2, &return_values);
