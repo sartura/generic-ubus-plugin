@@ -1,0 +1,250 @@
+### Information for opening a SSH session to the device ###
+[login]
+    address = "127.0.0.1:830" #"192.168.1.1:830"
+    username = "root"
+    password = "root"
+    enabled = true
+
+# install all modules
+[[test]]
+    XMLRequestBody = """
+    <module-install xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/generic-ubus-router-system@2019-06-24.yang</module-name-full>
+        <module-name-full>/etc/sysrepo/yang/generic-ubus-router-wireless@2019-06-24.yang</module-name-full>
+        <module-name-full>/etc/sysrepo/yang/generic-ubus-sip@2019-06-24.yang</module-name-full>
+        <module-name-full>/etc/sysrepo/yang/generic-ubus-system@2019-06-24.yang</module-name-full>
+    </module-install>
+    """
+    XMLResponse = """
+    <module-install-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/ubus-system@2019-06-24.yang</module-name-full>
+        <module-install-status>Installation of module /etc/sysrepo/yang/ubus-system@2019-06-24.yang succeeded</module-install-status>
+    </module-install-result>
+    <module-install-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/generic-ubus-router-wireless@2019-06-24.yang</module-name-full>
+        <module-install-status>Installation of module /etc/sysrepo/yang/generic-ubus-router-wireless@2019-06-24.yang succeeded</module-install-status>
+    </module-install-result>
+    <module-install-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/generic-ubus-sip@2019-06-24.yang</module-name-full>
+        <module-install-status>Installation of module /etc/sysrepo/yang/generic-ubus-sip@2019-06-24.yang succeeded</module-install-status>
+    </module-install-result>
+    <module-install-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <module-name-full>/etc/sysrepo/yang/generic-ubus-system@2019-06-24.yang</module-name-full>
+        <module-install-status>Installation of module /etc/sysrepo/yang/generic-ubus-system@2019-06-24.yang succeeded</module-install-status>
+    </module-install-result>
+    """
+# config one
+[[test]]
+    XMLRequestBody = """
+    <edit-config>
+        <target>
+            <running/>
+        </target>
+        <config>
+            <generic-ubus-config xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+                <ubus-object>
+                    <name>router.wireless</name>
+                    <yang-module>generic-ubus-router-wireless</yang-module>
+                    <method>
+                        <name>status</name>
+                        <message>{"vif":"wl0"}</message>
+                    </method>
+                </ubus-object>
+            </generic-ubus-config>
+        </config>
+    </edit-config>
+    """
+    XMLResponse = """<ok/>"""
+
+# get one
+[[test]]
+XMLRequestBody = """
+    <get>
+        <filter  xmlns:generic-ubus-router-wireless='https://terastream/ns/yang/generic-ubus-router-wireless' type="xpath" select="/generic-ubus-router-wireless:generic-ubus-router-wireless/status">
+        </filter>
+    </get>
+    """
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+    </data>
+    """
+# config remaining
+[[test]]
+    XMLRequestBody = """
+    <edit-config>
+        <target>
+            <running/>
+        </target>
+        <config>
+            <generic-ubus-config xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+                <ubus-object>
+                    <name>router.system</name>
+                    <yang-module>generic-ubus-router-system</yang-module>
+                    <method>
+                        <name>memory_bank</name>
+                    </method>
+                    <method>
+                        <name>info</name>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>asterisk.sip</name>
+                    <yang-module>generic-ubus-sip</yang-module>
+                    <method>
+                        <name>registry_status</name>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>system</name>
+                    <yang-module>generic-ubus-system</yang-module>
+                    <method>
+                        <name>status</name>
+                        <message>{}</message>
+                    </method>
+                </ubus-object>
+            </generic-ubus-config>
+        </config>
+    </edit-config>
+    """
+    XMLResponse = """<ok/>"""
+# get reamaining
+[[test]]
+XMLRequestBody = """
+    <get>
+        <filter  xmlns:generic-ubus-router-system='https://terastream/ns/yang/generic-ubus-router-system' type="xpath" select="/generic-ubus-router-system:generic-ubus-router-system/info">
+        </filter>
+    </get>
+    """
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+    </data>
+    """
+[[test]]
+XMLRequestBody = """
+    <get>
+        <filter  xmlns:generic-ubus-router-system='https://terastream/ns/yang/generic-ubus-router-system' type="xpath" select="/generic-ubus-router-system:generic-ubus-router-system/memory_bank">
+        </filter>
+    </get>
+    """
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+    </data>
+    """
+[[test]]
+XMLRequestBody = """
+    <get>
+        <filter  xmlns:generic-ubus-sip='https://terastream/ns/yang/generic-ubus-sip' type="xpath" select="/generic-ubus-sip:generic-ubus-sip/registry_status">
+        </filter>
+    </get>
+    """
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+    </data>
+    """
+[[test]]
+XMLRequestBody = """
+    <get>
+        <filter  xmlns:generic-ubus-system='https://terastream/ns/yang/generic-ubus-system' type="xpath" select="/generic-ubus-system:generic-ubus-system/board">
+        </filter>
+    </get>
+    """
+    XMLResponse = """
+    <data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+    </data>
+    """
+# ubus call a non module object
+[[test]]
+    XMLRequestBody = """
+    <ubus-call xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <ubus-invocation>
+            <ubus-object>sfp.ddm</ubus-object>
+            <ubus-method>get-all</ubus-method>
+        </ubus-invocation>
+    </ubus-call>
+    """
+    XMLResponse = """
+    <ubus-result xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+        <ubus-invocation>sfp.ddm get-all {}</ubus-invocation>
+        <ubus-response>{"voltage":"3.2210 V","current":"24.064 mA","tx-pwr":"0.2352 mW","tx-pwr-dBm":"-6.2856 dBm","rx-pwr":"0.0000 mW","rx-pwr-dBm":"-inf dBm","rx-pwr-type":"average"}</ubus-response>
+    </ubus-result>
+    """
+# delete all - first methods from 2 out of 4 then all
+[[test]]
+    XMLRequestBody = """
+    <edit-config>
+        <target>
+            <running/>
+        </target>
+        <config xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
+            <generic-ubus-config xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+                <ubus-object xc:operation="delete">
+                    <name>router.wireless</name>
+                    <yang-module>generic-ubus-router-wireless</yang-module>
+                    <method>
+                        <name>status</name>
+                        <message>{"vif":"wl0"}</message>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>router.system</name>
+                    <yang-module>generic-ubus-router-system</yang-module>
+                    <method xc:operation="delete">
+                        <name>memory_bank</name>
+                    </method>
+                    <method>
+                        <name>info</name>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>asterisk.sip</name>
+                    <yang-module>generic-ubus-sip</yang-module>
+                    <method xc:operation="delete">
+                        <name>registry_status</name>
+                    </method>
+                </ubus-object>
+                <ubus-object>
+                    <name>system</name>
+                    <yang-module>generic-ubus-system</yang-module>
+                    <method>
+                        <name>status</name>
+                        <message>{}</message>
+                    </method>
+                </ubus-object>
+            </generic-ubus-config>
+        </config>
+    </edit-config>
+    """
+    XMLResponse = """<ok/>"""
+
+[[test]]
+    XMLRequestBody = """
+    <edit-config>
+        <target>
+            <running/>
+        </target>
+        <config xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0">
+            <generic-ubus-config xmlns="https://terastream/ns/yang/terastream-generic-ubus">
+                <ubus-object xc:operation="delete">
+                    <name>router.system</name>
+                    <yang-module>generic-ubus-router-system</yang-module>
+                    <method>
+                        <name>info</name>
+                    </method>
+                </ubus-object>
+                <ubus-object xc:operation="delete">
+                    <name>asterisk.sip</name>
+                    <yang-module>generic-ubus-sip</yang-module>
+                </ubus-object>
+                <ubus-object xc:operation="delete">
+                    <name>system</name>
+                    <yang-module>generic-ubus-system</yang-module>
+                    <method>
+                        <name>status</name>
+                        <message>{}</message>
+                    </method>
+                </ubus-object>
+            </generic-ubus-config>
+        </config>
+    </edit-config>
+    """
+    XMLResponse = """<ok/>"""
