@@ -154,16 +154,19 @@ module terastream-generic-ubus {
                          description
                               "Module for which a feature needs
                               to be enabled/disabled.";
+                         mandatory true;
                          type string;
                     }
                     leaf feature-name {
                          description
                               "Feature that needs to be enabled/disabled.";
+                         mandatory true;
                          type string;
                     }
                     choice feature-action {
                          description
                               "Desired operation. Either enable or disable a feature";
+                         mandatory true;
                          case enable-action {
                               container enable {
                                    presence
