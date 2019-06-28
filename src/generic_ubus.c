@@ -490,7 +490,6 @@ cleanup:
     return rc;
 }
 
-// TODO: add that method message can be deleted, set change getter to
 /*
  * @brief Procedure for deleting an ubus_method structure.
  *
@@ -506,6 +505,7 @@ static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value)
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
+    char *leaf = NULL;
     char *key = NULL;
     rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
     CHECK_RET_MSG(rc, cleanup, "allocation key is null");
@@ -528,9 +528,20 @@ static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value)
         rc = ubus_object_delete_method(ubus_object, key);
         CHECK_RET_MSG(rc, cleanup, "delete ubus method error");
     }
+    else if (value->type == SR_STRING_T)
+    {
+        rc = xpath_get_tail_node(value->xpath, &leaf);
+        CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
+        if (strcmp("message", leaf) == 0)
+        {
+            rc = ubus_method_set_message(ubus_method, NULL);
+            CHECK_RET_MSG(rc, cleanup, "set ubus method message error");
+        }
+    }
 
 cleanup:
     free(key);
+    free(leaf);
     return rc;
 }
 
@@ -657,7 +668,7 @@ void generic_ubus_feature_cb(const char *module_name, const char *feature_name, 
         char *ubus_object_module_name = NULL;
         rc = ubus_object_get_yang_module(ubus_object_it, &ubus_object_module_name);
         CHECK_RET_MSG(rc, cleanup, "error getting yang module name");
-        if (strncmp(ubus_object_module_name, module_name, strlen(ubus_object_module_name)) == 0)
+        if (strncmp(ubus_object_module_name, module_name, strlen(module_name)) == 0)
         {
             ubus_object = ubus_object_it;
             break;
@@ -731,7 +742,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
             char *yang_module = NULL;
             rc = ubus_object_get_yang_module(ubus_object_it, &yang_module);
             CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
-            if (strncmp(yang_module, module_name, strlen(yang_module)) == 0)
+            if (strncmp(yang_module, module_name, strlen(module_name)) == 0)
             {
                 ubus_object = ubus_object_it;
                 break;
@@ -777,7 +788,7 @@ static int generic_ubus_operational_cb(const char *cb_xpath, sr_val_t **values, 
             rc = ubus_method_get_name(ubus_method_it, &ubus_method_name);
             CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
 
-            if (strncmp(ubus_method_name, method_name, strlen(ubus_method_name)) == 0)
+            if (strncmp(ubus_method_name, method_name, strlen(method_name)) == 0)
             {
                 ubus_method = ubus_method_it;
                 break;

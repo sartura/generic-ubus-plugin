@@ -96,12 +96,14 @@ int ubus_method_set_message(ubus_method_t *ubus_method, const char *message)
     int rc = SR_ERR_OK;
     char *message_local = NULL;
     CHECK_NULL_MSG(ubus_method, &rc, cleanup, "input argument ubus_method is null");
-    CHECK_NULL_MSG(message, &rc, cleanup, "input argument message is null");
 
-    message_local = calloc(strlen(message)+1, sizeof(char));
-    CHECK_NULL_MSG(message_local, &rc, cleanup, "memory allocation for message failed");
+    if (message != NULL)
+    {
+        message_local = calloc(strlen(message)+1, sizeof(char));
+        CHECK_NULL_MSG(message_local, &rc, cleanup, "memory allocation for message failed");
 
-    strncpy(message_local, message, strlen(message));
+        strncpy(message_local, message, strlen(message));
+    }
 
     if (ubus_method->message != NULL) free(ubus_method->message);
     ubus_method->message = message_local;
