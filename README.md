@@ -41,7 +41,10 @@ well as an XML example of the configurational data.
 The YANG module structure is shown below:
 ```
 container generic-ubus-config {
-    list ubus-objec {
+    leaf ubus-object-filter-file {
+        type string;
+    }
+    list ubus-object {
         key name;
         leaf name {
             type string;
@@ -381,8 +384,8 @@ This section discusses the ubus object filtering feature. This feature is used
 to enable the retrieval of ubus state data of only specific ubus
 objects/methods.
 
-This is accomplished by adding a file that contains regular expressions, which
-determine which ubus object will be ignored, that is, for which state data will
-not be retrieved. The file name and file path is specified in the CMakeLists.txt
-file. If the file does not exists or it has been deleted, the plugin will print
-an information message and all ubus objects will be available.
+The filtering feature is accomplished in the following way:
+* creating a file in a desired location and adding regular expressions for ubus object that need to be filtered out,
+* specifying the file path and file name in the generic ubus configuration YANG model (terastream-generic-ubus).
+
+If the file is empty, does not exist or is not specified in the terastream-generic-ubus YANG module no ubus object will be filtered out.

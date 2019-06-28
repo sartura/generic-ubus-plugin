@@ -54,6 +54,7 @@ int context_create(context_t **context)
     (*context)->startup_connection = NULL;
     (*context)->startup_session = NULL;
     (*context)->subscription = NULL;
+    (*context)->ubus_object_filter_file_name = NULL;
     INIT_LIST_HEAD(&(*context)->ubus_object_list);
 
 cleanup:
@@ -138,6 +139,44 @@ int context_set_startup_connection(context_t *context, sr_conn_ctx_t *connection
     context->startup_connection = connection;
 
 cleanup:
+    return rc;
+}
+
+/*
+ * @brief Setter method for the ubus object filter out file.
+ *
+ * @param[in] context context_t structure to be modified.
+ * @param[in] file_name name of the ubus object filter out file.
+ *
+ * @note path is included in hte file_name
+ *
+ * @return error code.
+*/
+int context_set_ubus_object_filter_file_name(context_t *context, const char *file_name)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+
+    char *ubus_object_filter_file_name = NULL;
+
+    if (file_name != NULL)
+    {
+        ubus_object_filter_file_name = calloc(strlen(file_name)+1, sizeof(char));
+        CHECK_NULL_MSG(ubus_object_filter_file_name, &rc, cleanup, "calloc error");
+
+        strncpy(ubus_object_filter_file_name, file_name, strlen(file_name));
+    }
+
+    if (context->ubus_object_filter_file_name != NULL)
+    {
+        free(context->ubus_object_filter_file_name);
+    }
+    context->ubus_object_filter_file_name = ubus_object_filter_file_name;
+
+    return rc;
+
+cleanup:
+    free(ubus_object_filter_file_name);
     return rc;
 }
 
@@ -346,6 +385,8 @@ void context_destroy(context_t **context)
 {
     if (*context != NULL)
     {
+        free((*context)->ubus_object_filter_file_name);
+
         int rc = SR_ERR_OK;
         if ((*context)->startup_session != NULL)
         {
@@ -388,59 +429,73 @@ int context_filter_ubus_object(context_t *context, const char *ubus_object_name,
     CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
     CHECK_NULL_MSG(ubus_object_name, &rc, cleanup, "input argument ubus_object_name is null");
     *skip = false;
+    FILE *fd = NULL;
 
-    struct stat st;
-    int result = stat(UBUS_OBJECT_FILTER_WATCH_FILE, &st);
-    if (result != 0)
+    if (context->ubus_object_filter_file_name != NULL)
+    {
+         struct stat st;
+        int result = stat(context->ubus_object_filter_file_name, &st);
+        if (result != 0)
+        {
+            rc = SR_ERR_OK;
+            WRN("file %s does not exist, no filtering will be done", context->ubus_object_filter_file_name);
+            return rc;
+        }
+
+        fd = fopen(context->ubus_object_filter_file_name, "r");
+        if (fd == NULL)
+        {
+            rc = SR_ERR_INTERNAL;
+            ERR("error opening file %s", context->ubus_object_filter_file_name);
+            return rc;
+        }
+
+        char file_ubus_object_name[256+1];
+        regex_t regular_expression;
+        int regrc = 0;
+
+        while(true)
+        {
+            memset(file_ubus_object_name, 0, 256+1);
+            int scanned_line = fscanf(fd, "%s\n", file_ubus_object_name);
+            if (scanned_line == EOF) { break; }
+
+            INF("%s", file_ubus_object_name);
+            INF("%s", ubus_object_name);
+
+            regrc = regcomp(&regular_expression, file_ubus_object_name, 0);
+            if (regrc != 0)
+            {
+                rc = SR_ERR_INTERNAL;
+            }
+
+            regrc = regexec(&regular_expression, ubus_object_name, 0, NULL, 0);
+            if (regrc == 0) {
+                INF_MSG("regex match");
+                *skip = true;
+                regfree(&regular_expression);
+                break;
+            }
+            else if (regrc == REG_NOMATCH)
+            {
+                *skip = false;
+                INF_MSG("regex no match");
+            }
+            else
+            {
+                rc = SR_ERR_INTERNAL;
+                ERR("regexec error: %d", regrc);
+            }
+            regfree(&regular_expression);
+        }
+    }
+    else
     {
         rc = SR_ERR_OK;
-        WRN("file %s does not exist, no filtering will be done", UBUS_OBJECT_FILTER_WATCH_FILE);
+        WRN_MSG("ubus objec filter file is not set");
         return rc;
     }
 
-    FILE *fd = fopen(UBUS_OBJECT_FILTER_WATCH_FILE, "r");
-    if (fd == NULL)
-    {
-        rc = SR_ERR_INTERNAL;
-        ERR("error opening file %s", UBUS_OBJECT_FILTER_WATCH_FILE);
-        return rc;
-    }
-
-    char file_ubus_object_name[256+1];
-    regex_t regular_expression;
-    int regrc = 0;
-
-    while(true)
-    {
-        memset(file_ubus_object_name, 0, 256+1);
-        int scanned_line = fscanf(fd, "%s\n", file_ubus_object_name);
-        if (scanned_line == EOF) { break; }
-
-        regrc = regcomp(&regular_expression, file_ubus_object_name, 0);
-        if (regrc != 0)
-        {
-            rc = SR_ERR_INTERNAL;
-        }
-
-        regrc = regexec(&regular_expression, ubus_object_name, 0, NULL, 0);
-        if (regrc == 0) {
-            INF_MSG("regex match");
-            *skip = true;
-            regfree(&regular_expression);
-            break;
-        }
-        else if (regrc == REG_NOMATCH)
-        {
-            *skip = false;
-            INF_MSG("regex no match");
-        }
-        else
-        {
-            rc = SR_ERR_INTERNAL;
-            ERR("regexec error: %d", regrc);
-        }
-        regfree(&regular_expression);
-    }
 
 
 cleanup:

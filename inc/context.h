@@ -40,6 +40,8 @@ struct context_s {
 	sr_session_ctx_t *startup_session;	 // session structure for startup DS
 	sr_conn_ctx_t *startup_connection;   // connection structure for startup DS
 
+	char *ubus_object_filter_file_name;
+
 	struct list_head ubus_object_list; // list of all registered ubus_objects
 };
 
@@ -56,6 +58,7 @@ int context_set_session(context_t *context, sr_session_ctx_t *session);
 int context_set_subscription(context_t *context, sr_subscription_ctx_t *subscription);
 int context_set_startup_session(context_t *context, sr_session_ctx_t *session);
 int context_set_startup_connection(context_t *context, sr_conn_ctx_t *connection);
+int context_set_ubus_object_filter_file_name(context_t *context, const char *file_name);
 int context_get_session(context_t *context, sr_session_ctx_t **session);
 int context_get_subscription(context_t *context, sr_subscription_ctx_t **subscription);
 int context_get_startup_session(context_t *context, sr_session_ctx_t **session);

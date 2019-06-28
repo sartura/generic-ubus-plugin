@@ -405,7 +405,7 @@ int ubus_object_init_libyang_data(ubus_object_t *ubus_object, sr_session_ctx_t *
     CHECK_NULL_MSG(session, &rc, cleanup, "input session is null");
 
     if (ubus_object->libyang_ctx != NULL) { ly_ctx_destroy(ubus_object->libyang_ctx, NULL); }
-    // TODO : ly_ctx and module here
+
     ubus_object->libyang_ctx = NULL;
     libyang_ctx = ly_ctx_new(NULL, LY_CTX_ALLIMPLEMENTED );
     CHECK_NULL_MSG(libyang_ctx, &rc, cleanup, "libyang_ctx is null");

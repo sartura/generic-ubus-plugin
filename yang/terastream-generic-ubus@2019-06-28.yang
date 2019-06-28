@@ -3,8 +3,13 @@ module terastream-generic-ubus {
      namespace "https://terastream/ns/yang/terastream-generic-ubus";
      prefix "ts-gu";
 
-     // organization "";
-     // contact "";
+     organization
+        "Deutsche Telekom AG";
+
+    contact
+        "Landgrabenweg 151
+        53227 Bonn, Germany";
+
 
      description
           "The module enables users to define necessary information for the
@@ -18,6 +23,9 @@ module terastream-generic-ubus {
           module specified.
           ";
 
+     revision "2019-06-28" {
+          description "Add ubus object filtering support.";
+     }
      revision "2019-06-12" {
           description "Add module install and feature enable RPC support.";
      }
@@ -36,6 +44,14 @@ module terastream-generic-ubus {
           description
                "Container for holding the necessary information for the
                generic ubus plugin.";
+
+          leaf ubus-object-filter-file {
+               description
+                    "Path to file containing ubus object that are going to be
+                    filtered out";
+               type string;
+          }
+
           list ubus-object {
                description
                     "List for every object for which the user wants to get the

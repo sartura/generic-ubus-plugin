@@ -43,6 +43,7 @@
 /*========================Defines=============================================*/
 #define YANG_UBUS_OBJECT "ubus-object"
 #define YANG_UBUS_METHOD "method"
+#define YANG_UBUS_FILTER "ubus-object-filter-file"
 
 /*========================Enumeration=========================================*/
 enum generic_ubus_operation_e { UBUS_OBJECT_CREATE,
@@ -51,6 +52,9 @@ enum generic_ubus_operation_e { UBUS_OBJECT_CREATE,
                                 UBUS_METHOD_CREATE,
                                 UBUS_METHOD_MODIFY,
                                 UBUS_METHOD_DELETE,
+                                UBUS_FILTER_CREATE,
+                                UBUS_FILTER_MODIFY,
+                                UBUS_FILTER_DELETE,
                                 DO_NOTHING };
 
 /*===============================Type definition==============================*/
@@ -61,6 +65,7 @@ static generic_ubus_operation_t generic_ubus_get_operation(sr_change_oper_t oper
 static int generic_ubus_create_ubus_object(context_t *context, sr_val_t *value);
 static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value);
 static int generic_ubus_delete_ubus_object(context_t *context, sr_val_t *value);
+static int generic_ubus_update_filter(context_t *context, sr_val_t *value);
 static int generic_ubus_create_ubus_method(context_t *context, sr_val_t *value);
 static int generic_ubus_modify_ubus_method(context_t *context, sr_val_t *value);
 static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value);
@@ -131,7 +136,6 @@ int generic_ubus_apply_module_changes(context_t *context, const char *module_nam
     char xpath[256+1] = {0};
 
     snprintf(xpath, strlen(module_name) + 4, "/%s:*", module_name);
-    INF("%s", xpath);
 
     rc = sr_get_changes_iter(session, xpath, &it);
     SR_CHECK_RET(rc, cleanup, "sr_get_change_iter: %s", sr_strerror(rc));
@@ -168,6 +172,15 @@ int generic_ubus_apply_module_changes(context_t *context, const char *module_nam
             case UBUS_METHOD_DELETE:
                 rc = generic_ubus_delete_ubus_method(context, old_value);
                 CHECK_RET_MSG(rc, cleanup, "error while deleting ubus_method");
+                break;
+            case UBUS_FILTER_CREATE:
+            case UBUS_FILTER_MODIFY:
+                rc = generic_ubus_update_filter(context, new_value);
+                CHECK_RET_MSG(rc, cleanup, "error while modifying ubus filter");
+                break;
+            case UBUS_FILTER_DELETE:
+                rc = generic_ubus_update_filter(context, NULL);
+                CHECK_RET_MSG(rc, cleanup, "error while deleting ubus filter");
                 break;
             default:
                 WRN_MSG("operation not supported in plugin");
@@ -213,6 +226,15 @@ static generic_ubus_operation_t generic_ubus_get_operation(sr_change_oper_t oper
         ERR_MSG("xpath get tail list node error");
         goto cleanup;
     }
+    else if (rc == -2)
+    {
+        rc = xpath_get_tail_node(xpath, &tail_node);
+        if (rc == SR_ERR_INTERNAL)
+        {
+            ERR_MSG("xpath get tail list node error");
+            goto cleanup;
+        }
+    }
 
     if (operation == SR_OP_CREATED && new_value != NULL && old_value == NULL)
     {
@@ -221,6 +243,10 @@ static generic_ubus_operation_t generic_ubus_get_operation(sr_change_oper_t oper
             if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) { plugin_operation = UBUS_OBJECT_CREATE; }
             else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) { plugin_operation = UBUS_METHOD_CREATE;}
         }
+        else if (new_value->type == SR_STRING_T)
+        {
+            if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) { plugin_operation = UBUS_FILTER_CREATE; }
+        }
     }
     if ((operation == SR_OP_MODIFIED || operation == SR_OP_CREATED) && new_value != NULL)
     {
@@ -228,6 +254,7 @@ static generic_ubus_operation_t generic_ubus_get_operation(sr_change_oper_t oper
         {
             if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) { plugin_operation = UBUS_OBJECT_MODIFY; }
             else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) { plugin_operation = UBUS_METHOD_MODIFY; }
+            else if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) { plugin_operation = UBUS_FILTER_MODIFY; }
         }
     }
     if (operation == SR_OP_DELETED && old_value != NULL && new_value ==  NULL)
@@ -236,6 +263,7 @@ static generic_ubus_operation_t generic_ubus_get_operation(sr_change_oper_t oper
         {
             if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) { plugin_operation = UBUS_OBJECT_DELETE; }
             else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) { plugin_operation = UBUS_METHOD_DELETE; }
+            else if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) { plugin_operation = UBUS_FILTER_DELETE; }
         }
 
     }
@@ -462,6 +490,7 @@ cleanup:
     return rc;
 }
 
+// TODO: add that method message can be deleted, set change getter to
 /*
  * @brief Procedure for deleting an ubus_method structure.
  *
@@ -502,6 +531,33 @@ static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value)
 
 cleanup:
     free(key);
+    return rc;
+}
+
+/*
+ * @brief Updating the value of the ubus object filter file name.
+ *
+ * @param[in] context holding the ubus object and ubus method objects.
+ * @param[in] value sysrepo value containing the change.
+ *
+ * @return error code.
+*/
+static int generic_ubus_update_filter(context_t *context, sr_val_t *value)
+{
+    int rc = SR_ERR_OK;
+    CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+
+    char *data = NULL;
+
+    if (value != NULL)
+    {
+        data = value->data.string_val;
+    }
+
+    rc = context_set_ubus_object_filter_file_name(context, data);
+    CHECK_RET_MSG(rc, cleanup, "set ubus object filter file name error");
+
+cleanup:
     return rc;
 }
 
@@ -552,6 +608,12 @@ static int generic_ubus_set_context(context_t *context, sr_val_t *value)
         INF_MSG("modify ubus method");
         rc = generic_ubus_modify_ubus_method(context, value);
         CHECK_RET_MSG(rc, cleanup, "modify ubus method error");
+    }
+    else if (strncmp(tail_node, YANG_UBUS_FILTER, strlen(tail_node)) == 0 && value->type == SR_STRING_T)
+    {
+        INF_MSG("modify ubus object fitler");
+        rc = generic_ubus_update_filter(context, value);
+        CHECK_RET_MSG(rc, cleanup, "modify ubus object filter error");
     }
     else
     {

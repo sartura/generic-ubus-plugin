@@ -8,8 +8,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall -g")
 
-add_definitions(-DUBUS_OBJECT_FILTER_WATCH_FILE="/tmp/generic-ubus-object-ignore")
-
 include_directories(inc)
 
 set(SOURCES
