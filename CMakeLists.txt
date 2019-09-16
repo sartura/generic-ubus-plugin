@@ -8,24 +8,24 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11 -Wall -g")
 
-include_directories(inc)
+# include_directories(inc)
 
 set(SOURCES
 	src/generic_ubus.c
-    inc/generic_ubus.h
+    src/generic_ubus.h
     src/main.c
-    inc/common.h
+    src/common.h
     src/context.c
-    inc/context.h
+    src/context.h
     src/ubus_method.c
-    inc/ubus_method.h
+    src/ubus_method.h
     src/ubus_object.c
-    inc/ubus_object.h
-    inc/version.h
-    inc/xpath.h
+    src/ubus_object.h
+    src/version.h
+    src/xpath.h
     src/xpath.c
     src/ubus_call.c
-    inc/ubus_call.h)
+    src/ubus_call.h)
 
 # git SHA1 hash
 execute_process(COMMAND
@@ -55,7 +55,7 @@ if (PKG_CONFIG_FOUND)
 endif()
 
 # generate version.h
-configure_file("${PROJECT_SOURCE_DIR}/inc/version.h.in" "${PROJECT_SOURCE_DIR}/inc/version.h" ESCAPE_QUOTES @ONLY)
+configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" ESCAPE_QUOTES @ONLY)
 
 if(PLUGIN)
 	add_library(${CMAKE_PROJECT_NAME} MODULE ${SOURCES})

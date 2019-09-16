@@ -1,8 +1,8 @@
 /*
- * @file ubus_call.h
+ * @file ubus_object.h
  * @author Luka Paulic <luka.paulic@sartura.hr>
  *
- * @brief File contains function prototypes for abstracting the libubus calls.
+ * @brief File contains function prototypes for xpath manipulation in the plugin
  *
  * @copyright
  * Copyright (C) 2019 Deutsche Telekom AG.
@@ -19,17 +19,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
-*/
-#ifndef _UBUS_CALL_H_
-#define _UBUS_CALL_H_
-
-/*=========================Includes===========================================*/
-#include <libubus.h>
-#include <libubox/blobmsg_json.h>
-#include <json-c/json.h>
+ */
+#ifndef _XPATH_H_
+#define _XPATH_H_
 
 /*=========================Function prototypes================================*/
-void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg);
-int ubus_call(const char *ubus_object_name, const char *ubus_method_name, const char *ubus_message, void(*f)(struct ubus_request *, int, struct blob_attr *), char **result);
+int xpath_get_tail_node(const char *xpath, char **node);
+int xpath_get_node_key_value(char *xpath, const char *node_name,
+                             const char *key_name, char **key_value);
+int xpath_get_tail_list_node(const char *xpath, char **node);
+int xpath_get_module_name(const char *xpath, char **module_name);
 
-#endif //__UBUS_CALL_
+#endif //_XPATH_H_
