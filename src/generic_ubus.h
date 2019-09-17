@@ -76,7 +76,11 @@ int generic_ubus_module_install_rpc_cb(sr_session_ctx_t *session,
                                        const size_t input_cnt, sr_event_t event,
                                        uint32_t request_id, sr_val_t **output,
                                        size_t *output_cnt, void *private_data);
-
+void generic_ubus_event_notif_cb(sr_session_ctx_t *session,
+                                 const sr_ev_notif_type_t notif_type,
+                                 const char *path, const sr_val_t *values,
+                                 const size_t values_cnt, time_t timestamp,
+                                 void *private_data);
 int generic_ubus_feature_update_rpc_cb(sr_session_ctx_t *session,
                                        const char *op_path,
                                        const sr_val_t *input,

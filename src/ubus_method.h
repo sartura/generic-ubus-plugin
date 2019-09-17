@@ -20,7 +20,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
-*/
+ */
 #ifndef _UBUS_METHOD_H_
 #define _UBUS_METHOD_H_
 
@@ -29,10 +29,10 @@
 
 /*================Structure definition========================================*/
 struct ubus_method_s {
-	char *name;		// ubus method name
-	char *message;  // ubus method message in JSON format
+  char *name;    // ubus method name
+  char *message; // ubus method message in JSON format
 
-	struct list_head list; // structure for list functionalities
+  struct list_head list; // structure for list functionalities
 };
 
 /*===============================Type definition==============================*/

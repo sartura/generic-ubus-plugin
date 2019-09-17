@@ -26,6 +26,7 @@
 
 /*=========================Includes===========================================*/
 #include <libubox/list.h>
+#include <sysrepo.h>
 
 #include "libyang/libyang.h"
 #include "libyang/tree_schema.h"

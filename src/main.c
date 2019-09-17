@@ -108,10 +108,11 @@ int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx) {
   SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
 
   /*
-    INF_MSG("Subscribing to feature change");
-    rc = sr_feature_enable_subscribe(session, generic_ubus_feature_cb,
-                                     *private_ctx, SR_SUBSCR_CTX_REUSE,
-                                     &context->subscription);
+    // TODO: register for each new YANG module individually, maybe unecessary
+    INF_MSG("Subscribing to event notification");
+    rc = sr_event_notif_subscribe(session, NULL, NULL, (time_t){0}, (time_t){0},
+                                  generic_ubus_event_notif_cb, *private_ctx,
+                                  SR_SUBSCR_CTX_REUSE, &context->subscription);
     SR_CHECK_RET(rc, cleanup, "feature subscription error: %s",
     sr_strerror(rc));
   */
