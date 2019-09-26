@@ -108,7 +108,7 @@ int generic_ubus_load_startup_datastore(context_t *context) {
   size_t count = 0;
   char *xpath = "/" YANG_MODEL ":generic-ubus-config//*";
 
-  rc = sr_get_items(context->startup_session, xpath, &values, &count);
+  rc = sr_get_items(context->startup_session, xpath, 0, &values, &count);
   if (SR_ERR_NOT_FOUND == rc) {
     INF_MSG("empty startup datastore for context data");
     return SR_ERR_OK;
@@ -1016,7 +1016,7 @@ int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name,
   if (SR_EV_DONE == event) {
     /* copy running datastore to startup */
     rc = sr_copy_config(context->startup_session, YANG_MODEL, SR_DS_RUNNING,
-                        SR_DS_STARTUP);
+                        SR_DS_STARTUP, 0);
     if (SR_ERR_OK != rc) {
       WRN_MSG("Failed to copy running datastore to startup");
       return rc;
