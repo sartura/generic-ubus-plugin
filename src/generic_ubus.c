@@ -108,7 +108,7 @@ int generic_ubus_load_startup_datastore(context_t *context) {
   size_t count = 0;
   char *xpath = "/" YANG_MODEL ":generic-ubus-config//*";
 
-  rc = sr_get_items(context->startup_session, xpath, 0, &values, &count);
+  rc = sr_get_items(context->startup_session, xpath, 0, 0, &values, &count);
   if (SR_ERR_NOT_FOUND == rc) {
     INF_MSG("empty startup datastore for context data");
     return SR_ERR_OK;
