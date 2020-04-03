@@ -24,9 +24,9 @@
 #define _UBUS_CALL_H_
 
 /*=========================Includes===========================================*/
+#include <libubus.h>
 #include <json-c/json.h>
 #include <libubox/blobmsg_json.h>
-#include <libubus.h>
 
 /*=========================Function prototypes================================*/
 void ubus_get_response_cb(struct ubus_request *req, int type,
