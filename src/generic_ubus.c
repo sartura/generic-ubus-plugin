@@ -1016,7 +1016,7 @@ int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name,
   if (SR_EV_DONE == event) {
     /* copy running datastore to startup */
     rc = sr_copy_config(context->startup_session, YANG_MODEL, SR_DS_RUNNING,
-                        SR_DS_STARTUP, 0);
+                        0, 0);
     if (SR_ERR_OK != rc) {
       WRN_MSG("Failed to copy running datastore to startup");
       return rc;
