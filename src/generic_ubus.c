@@ -31,24 +31,25 @@
 
 /*=========================Includes===========================================*/
 #include <inttypes.h>
+#include <unistd.h>
+#include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <unistd.h>
 
-#include "sysrepo.h"
+#include <json-c/json.h>
 
+#include <sysrepo.h>
+#include <sysrepo/values.h>
+#include <libyang/tree_data.h>
+#include <libyang/tree_schema.h>
+
+#include <srpo_ubus.h>
+
+#include "xpath.h"
 #include "common.h"
 #include "context.h"
 #include "generic_ubus.h"
-#include "ubus_call.h"
-
-#include "xpath.h"
-
-#include "sysrepo/values.h"
-
-#include "libyang/tree_data.h"
-#include "libyang/tree_schema.h"
 #include "utils/memory.h"
 
 /*========================Defines=============================================*/
@@ -91,6 +92,7 @@ generic_ubus_operational_cb(sr_session_ctx_t *session, const char *module_name,
 			    uint32_t request_id, struct lyd_node **parent,
 			    void *private_data);
 static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node);
+static void srpo_ubus_get_response_cb(const char *ubus_json, srpo_ubus_result_values_t *values);
 /*
 static int generic_ubus_set_sysrepo_data(struct lyd_node *root,
                                          sr_val_t **values, size_t *values_cnt);
@@ -714,6 +716,8 @@ generic_ubus_operational_cb(sr_session_ctx_t *session, const char *module_name,
 	static struct lys_module *libyang_module = NULL;
 	sr_conn_ctx_t *connection = NULL;
 	const struct ly_ctx *libyang_context = NULL;
+	srpo_ubus_result_values_t *values = NULL;
+	srpo_ubus_call_data_t ubus_call_data;
 
 	CHECK_NULL_MSG(path, &rc, cleanup, "input argument cb_xpath is null");
 	CHECK_NULL_MSG(private_data, &rc, cleanup, "input argument private_ctx is null");
@@ -771,8 +775,20 @@ generic_ubus_operational_cb(sr_session_ctx_t *session, const char *module_name,
 			CHECK_RET_MSG(rc, cleanup, "ubus method get method message error");
 
 			result_json_data = NULL;
-			rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+			srpo_ubus_init_result_values(&values);
+
+			ubus_call_data = (srpo_ubus_call_data_t){
+				.lookup_path = ubus_object_name, .method = ubus_method_name,
+				.transform_data_cb = srpo_ubus_get_response_cb, .timeout = 0,
+				.json_call_arguments = ubus_message
+			};
+
+			rc = srpo_ubus_call(values, &ubus_call_data);
 			CHECK_RET_MSG(rc, cleanup, "ubus call error");
+
+			result_json_data = xstrdup(values->values[0].value);
+			srpo_ubus_free_result_values(values);
+			values = NULL;
 
 			parsed_json = json_tokener_parse(result_json_data);
 			CHECK_NULL_MSG(parsed_json, &rc, cleanup, "tokener parser error");
@@ -787,6 +803,7 @@ generic_ubus_operational_cb(sr_session_ctx_t *session, const char *module_name,
 
 			FREE_SAFE(result_json_data);
 			result_json_data = NULL;
+
 			if (parsed_json != NULL) {
 				json_object_put(parsed_json);
 				parsed_json = NULL;
@@ -805,6 +822,10 @@ generic_ubus_operational_cb(sr_session_ctx_t *session, const char *module_name,
 cleanup:
 	FREE_SAFE(xpath_method_name);
 	FREE_SAFE(result_json_data);
+
+	if (values) {
+		srpo_ubus_free_result_values(values);
+	}
 
 	if (parsed_json != NULL) {
 		json_object_put(parsed_json);
@@ -945,6 +966,8 @@ int generic_ubus_ubus_call_rpc_cb(sr_session_ctx_t *session, const char *op_path
 	char *result_json_data = NULL;
 	context_t *context = (context_t *)private_data;
 	const char *ubus_object_filtered_out_message = "Ubus object is filtered out";
+	srpo_ubus_result_values_t *values = NULL;
+	srpo_ubus_call_data_t ubus_call_data;
 
 	*output_cnt = 0;
 
@@ -973,8 +996,20 @@ int generic_ubus_ubus_call_rpc_cb(sr_session_ctx_t *session, const char *op_path
 
 			INF("%d", skip_ubus_object);
 			if (skip_ubus_object == false) {
-				rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+				srpo_ubus_init_result_values(&values);
+
+				ubus_call_data = (srpo_ubus_call_data_t){
+					.lookup_path = ubus_object_name, .method = ubus_method_name,
+					.transform_data_cb = srpo_ubus_get_response_cb, .timeout = 0,
+					.json_call_arguments = ubus_message
+				};
+
+				rc = srpo_ubus_call(values, &ubus_call_data);
 				CHECK_RET_MSG(rc, cleanup, "ubus call error");
+
+				result_json_data = xstrdup(values->values[0].value);
+				srpo_ubus_free_result_values(values);
+				values = NULL;
 			} else {
 				result_json_data = calloc(1, strlen(ubus_object_filtered_out_message) + 1);
 				CHECK_NULL_MSG(result_json_data, &rc, cleanup, "result json data alloc error");
@@ -1023,6 +1058,10 @@ int generic_ubus_ubus_call_rpc_cb(sr_session_ctx_t *session, const char *op_path
 cleanup:
 	FREE_SAFE(tail_node);
 	FREE_SAFE(result_json_data);
+
+	if (values) {
+		srpo_ubus_free_result_values(values);
+	}
 
 	if (result != NULL) {
 		sr_free_values(result, count);
@@ -1223,6 +1262,22 @@ cleanup:
 	}
 
 	return rc;
+}
+
+/*
+ * @brief SRPO ubus response callback
+ *
+ * @param[in] ubus_json
+ * @param[out] values
+ *
+ */
+static void srpo_ubus_get_response_cb(const char *ubus_json, srpo_ubus_result_values_t *values)
+{
+	values->values = xrealloc(values->values, sizeof(srpo_ubus_result_value_t) * (values->num_values + 1));
+	values->values[values->num_values].value = xstrndup(ubus_json, strlen(ubus_json) + 1);
+	values->num_values++;
+
+	return;
 }
 
 

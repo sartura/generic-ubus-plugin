@@ -21,8 +21,6 @@ set(SOURCES
     src/version.h
     src/xpath.h
     src/xpath.c
-    src/ubus_call.c
-    src/ubus_call.h
 )
 
 # git SHA1 hash
