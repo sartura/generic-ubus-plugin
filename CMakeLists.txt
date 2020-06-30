@@ -11,7 +11,6 @@ include_directories(${CMAKE_SOURCE_DIR}/src/)
 set(SOURCES
     src/generic_ubus.c
     src/generic_ubus.h
-    src/main.c
     src/common.h
     src/context.c
     src/context.h
