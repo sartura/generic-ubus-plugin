@@ -29,11 +29,9 @@
 #include <libubox/blobmsg_json.h>
 
 /*=========================Function prototypes================================*/
-void ubus_get_response_cb(struct ubus_request *req, int type,
-                          struct blob_attr *msg);
+void ubus_get_response_cb(struct ubus_request *req, int type, struct blob_attr *msg);
 int ubus_call(const char *ubus_object_name, const char *ubus_method_name,
-              const char *ubus_message,
-              void (*f)(struct ubus_request *, int, struct blob_attr *),
-              char **result);
+	      const char *ubus_message, void (*f)(struct ubus_request *, int, struct blob_attr *),
+	      char **result);
 
 #endif //__UBUS_CALL_

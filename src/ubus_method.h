@@ -28,11 +28,12 @@
 #include <libubox/list.h>
 
 /*================Structure definition========================================*/
-struct ubus_method_s {
-  char *name;    // ubus method name
-  char *message; // ubus method message in JSON format
+struct ubus_method_s
+{
+	char *name;    // ubus method name
+	char *message; // ubus method message in JSON format
 
-  struct list_head list; // structure for list functionalities
+	struct list_head list; // structure for list functionalities
 };
 
 /*===============================Type definition==============================*/

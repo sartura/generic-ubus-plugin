@@ -56,17 +56,18 @@
 #define YANG_UBUS_FILTER "ubus-object-filter-file"
 
 /*========================Enumeration=========================================*/
-enum generic_ubus_operation_e {
-  UBUS_OBJECT_CREATE,
-  UBUS_OBJECT_MODIFY,
-  UBUS_OBJECT_DELETE,
-  UBUS_METHOD_CREATE,
-  UBUS_METHOD_MODIFY,
-  UBUS_METHOD_DELETE,
-  UBUS_FILTER_CREATE,
-  UBUS_FILTER_MODIFY,
-  UBUS_FILTER_DELETE,
-  DO_NOTHING
+enum generic_ubus_operation_e
+{
+	UBUS_OBJECT_CREATE,
+	UBUS_OBJECT_MODIFY,
+	UBUS_OBJECT_DELETE,
+	UBUS_METHOD_CREATE,
+	UBUS_METHOD_MODIFY,
+	UBUS_METHOD_DELETE,
+	UBUS_FILTER_CREATE,
+	UBUS_FILTER_MODIFY,
+	UBUS_FILTER_DELETE,
+	DO_NOTHING
 };
 
 /*===============================Type definition==============================*/
@@ -74,8 +75,7 @@ typedef enum generic_ubus_operation_e generic_ubus_operation_t;
 
 /*=========================Function prototypes================================*/
 static generic_ubus_operation_t
-generic_ubus_get_operation(sr_change_oper_t operation, sr_val_t *old_value,
-                           sr_val_t *new_value);
+generic_ubus_get_operation(sr_change_oper_t operation, sr_val_t *old_value, sr_val_t *new_value);
 static int generic_ubus_create_ubus_object(context_t *context, sr_val_t *value);
 static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value);
 static int generic_ubus_delete_ubus_object(context_t *context, sr_val_t *value);
@@ -86,12 +86,10 @@ static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value);
 static int generic_ubus_set_context(context_t *context, sr_val_t *value);
 static int
 generic_ubus_operational_cb(sr_session_ctx_t *session, const char *module_name,
-                            const char *path, const char *request_xpath,
-                            uint32_t request_id, struct lyd_node **parent,
-                            void *private_data);
-static int generic_ubus_walk_json(json_object *object,
-                                  struct lys_module *module,
-                                  struct lyd_node *node);
+			    const char *path, const char *request_xpath,
+			    uint32_t request_id, struct lyd_node **parent,
+			    void *private_data);
+static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node);
 /*
 static int generic_ubus_set_sysrepo_data(struct lyd_node *root,
                                          sr_val_t **values, size_t *values_cnt);
@@ -110,32 +108,33 @@ static int generic_ubus_libyang_to_sysrepo(struct lyd_node_leaf_list *node,
  *
  * @return error code.
  */
-int generic_ubus_load_startup_datastore(context_t *context) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+int generic_ubus_load_startup_datastore(context_t *context)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
 
-  sr_val_t *values = NULL;
-  size_t count = 0;
-  char *xpath = "/" YANG_MODEL ":generic-ubus-config//*";
+	sr_val_t *values = NULL;
+	size_t count = 0;
+	char *xpath = "/" YANG_MODEL ":generic-ubus-config//*";
 
-  rc = sr_get_items(context->startup_session, xpath, 0, 0, &values, &count);
-  if (SR_ERR_NOT_FOUND == rc) {
-    INF_MSG("empty startup datastore for context data");
-    return SR_ERR_OK;
-  } else if (SR_ERR_OK != rc) {
-    goto cleanup;
-  }
+	rc = sr_get_items(context->startup_session, xpath, 0, 0, &values, &count);
+	if (SR_ERR_NOT_FOUND == rc) {
+		INF_MSG("empty startup datastore for context data");
+		return SR_ERR_OK;
+	} else if (SR_ERR_OK != rc) {
+		goto cleanup;
+	}
 
-  INF("setting context data: %d", count);
-  for (size_t i = 0; i < count; i++) {
-    generic_ubus_set_context(context, &(values[i]));
-  }
+	INF("setting context data: %d", count);
+	for (size_t i = 0; i < count; i++) {
+		generic_ubus_set_context(context, &(values[i]));
+	}
 
 cleanup:
-  if (values != NULL && 0 < count) {
-    sr_free_values(values, count);
-  }
-  return rc;
+	if (values != NULL && 0 < count) {
+		sr_free_values(values, count);
+	}
+	return rc;
 }
 
 /*
@@ -148,88 +147,86 @@ cleanup:
  *
  * @return error code.
  */
-int generic_ubus_apply_module_changes(context_t *context,
-                                      const char *module_name,
-                                      sr_session_ctx_t *session) {
-  int rc = SR_ERR_OK;
-  sr_change_oper_t operation;
-  sr_change_iter_t *it = NULL;
-  sr_val_t *old_value = NULL;
-  sr_val_t *new_value = NULL;
+int generic_ubus_apply_module_changes(context_t *context, const char *module_name, sr_session_ctx_t *session)
+{
+	int rc = SR_ERR_OK;
+	sr_change_oper_t operation;
+	sr_change_iter_t *it = NULL;
+	sr_val_t *old_value = NULL;
+	sr_val_t *new_value = NULL;
 
-  char xpath[256 + 1] = {0};
+	char xpath[256 + 1] = {0};
 
-  snprintf(xpath, strlen(module_name) + 7, "/%s:*//.", module_name);
+	snprintf(xpath, strlen(module_name) + 7, "/%s:*//.", module_name);
 
-  rc = sr_get_changes_iter(session, xpath, &it);
-  SR_CHECK_RET(rc, cleanup, "sr_get_change_iter: %s", sr_strerror(rc));
+	rc = sr_get_changes_iter(session, xpath, &it);
+	SR_CHECK_RET(rc, cleanup, "sr_get_change_iter: %s", sr_strerror(rc));
 
-  while (1) {
-    int cont =
-        sr_get_change_next(session, it, &operation, &old_value, &new_value);
-    if (cont != SR_ERR_OK) {
-      break;
-    }
+	while (1) {
+		int cont = sr_get_change_next(session, it, &operation, &old_value, &new_value);
+		if (cont != SR_ERR_OK) {
+			break;
+		}
 
-    generic_ubus_operation_t plugin_operation =
-        generic_ubus_get_operation(operation, old_value, new_value);
+		generic_ubus_operation_t plugin_operation =
+			generic_ubus_get_operation(operation, old_value, new_value);
 
-    switch (plugin_operation) {
-    case UBUS_OBJECT_CREATE:
-      rc = generic_ubus_create_ubus_object(context, new_value);
-      CHECK_RET_MSG(rc, cleanup, "error while creating ubus_object");
-      break;
-    case UBUS_OBJECT_MODIFY:
-      rc = generic_ubus_modify_ubus_object(context, new_value);
-      CHECK_RET_MSG(rc, cleanup, "error while modifing ubus_object");
-      break;
-    case UBUS_OBJECT_DELETE:
-      rc = generic_ubus_delete_ubus_object(context, old_value);
-      CHECK_RET_MSG(rc, cleanup, "error while deleting ubus_object");
-      break;
-    case UBUS_METHOD_CREATE:
-      rc = generic_ubus_create_ubus_method(context, new_value);
-      CHECK_RET_MSG(rc, cleanup, "error while creating ubus_method");
-      break;
-    case UBUS_METHOD_MODIFY:
-      rc = generic_ubus_modify_ubus_method(context, new_value);
-      CHECK_RET_MSG(rc, cleanup, "error while modifing ubus_method");
-      break;
-    case UBUS_METHOD_DELETE:
-      rc = generic_ubus_delete_ubus_method(context, old_value);
-      CHECK_RET_MSG(rc, cleanup, "error while deleting ubus_method");
-      break;
-    case UBUS_FILTER_CREATE:
-    case UBUS_FILTER_MODIFY:
-      rc = generic_ubus_update_filter(context, new_value);
-      CHECK_RET_MSG(rc, cleanup, "error while modifying ubus filter");
-      break;
-    case UBUS_FILTER_DELETE:
-      rc = generic_ubus_update_filter(context, NULL);
-      CHECK_RET_MSG(rc, cleanup, "error while deleting ubus filter");
-      break;
-    default:
-      WRN_MSG("operation not supported in plugin");
-      break;
-    }
+		switch (plugin_operation) {
+			case UBUS_OBJECT_CREATE:
+				rc = generic_ubus_create_ubus_object(context, new_value);
+				CHECK_RET_MSG(rc, cleanup, "error while creating ubus_object");
+				break;
+			case UBUS_OBJECT_MODIFY:
+				rc = generic_ubus_modify_ubus_object(context, new_value);
+				CHECK_RET_MSG(rc, cleanup, "error while modifing ubus_object");
+				break;
+			case UBUS_OBJECT_DELETE:
+				rc = generic_ubus_delete_ubus_object(context, old_value);
+				CHECK_RET_MSG(rc, cleanup, "error while deleting ubus_object");
+				break;
+			case UBUS_METHOD_CREATE:
+				rc = generic_ubus_create_ubus_method(context, new_value);
+				CHECK_RET_MSG(rc, cleanup, "error while creating ubus_method");
+				break;
+			case UBUS_METHOD_MODIFY:
+				rc = generic_ubus_modify_ubus_method(context, new_value);
+				CHECK_RET_MSG(rc, cleanup, "error while modifing ubus_method");
+				break;
+			case UBUS_METHOD_DELETE:
+				rc = generic_ubus_delete_ubus_method(context, old_value);
+				CHECK_RET_MSG(rc, cleanup, "error while deleting ubus_method");
+				break;
+			case UBUS_FILTER_CREATE:
+			case UBUS_FILTER_MODIFY:
+				rc = generic_ubus_update_filter(context, new_value);
+				CHECK_RET_MSG(rc, cleanup, "error while modifying ubus filter");
+				break;
+			case UBUS_FILTER_DELETE:
+				rc = generic_ubus_update_filter(context, NULL);
+				CHECK_RET_MSG(rc, cleanup, "error while deleting ubus filter");
+				break;
+			default:
+				WRN_MSG("operation not supported in plugin");
+				break;
+		}
 
-    sr_free_val(old_value);
-    sr_free_val(new_value);
-  }
-  old_value = NULL;
-  new_value = NULL;
+		sr_free_val(old_value);
+		sr_free_val(new_value);
+	}
+	old_value = NULL;
+	new_value = NULL;
 
 cleanup:
-  if (old_value != NULL) {
-    sr_free_val(old_value);
-  }
-  if (new_value != NULL) {
-    sr_free_val(new_value);
-  }
-  if (it != NULL) {
-    sr_free_change_iter(it);
-  }
-  return rc;
+	if (old_value != NULL) {
+		sr_free_val(old_value);
+	}
+	if (new_value != NULL) {
+		sr_free_val(new_value);
+	}
+	if (it != NULL) {
+		sr_free_change_iter(it);
+	}
+	return rc;
 }
 
 /*
@@ -245,68 +242,66 @@ cleanup:
  * @return error code.
  */
 static generic_ubus_operation_t
-generic_ubus_get_operation(sr_change_oper_t operation, sr_val_t *old_value,
-                           sr_val_t *new_value) {
-  generic_ubus_operation_t plugin_operation = DO_NOTHING;
+generic_ubus_get_operation(sr_change_oper_t operation, sr_val_t *old_value, sr_val_t *new_value)
+{
+	generic_ubus_operation_t plugin_operation = DO_NOTHING;
 
-  char *tail_node = NULL;
-  const char *xpath = (new_value != NULL)
-                          ? new_value->xpath
-                          : ((old_value != NULL) ? old_value->xpath : NULL);
-  int rc = 0;
-  INF("%s", xpath);
-  rc = xpath_get_tail_list_node(xpath, &tail_node);
-  if (rc == SR_ERR_INTERNAL) {
-    ERR_MSG("xpath get tail list node error");
-    goto cleanup;
-  } else if (rc == -2) {
-    rc = xpath_get_tail_node(xpath, &tail_node);
-    if (rc == SR_ERR_INTERNAL) {
-      ERR_MSG("xpath get tail list node error");
-      goto cleanup;
-    }
-  }
+	char *tail_node = NULL;
+	const char *xpath = (new_value != NULL) ? new_value->xpath : ((old_value != NULL) ? old_value->xpath : NULL);
+	int rc = 0;
+	INF("%s", xpath);
+	rc = xpath_get_tail_list_node(xpath, &tail_node);
+	if (rc == SR_ERR_INTERNAL) {
+		ERR_MSG("xpath get tail list node error");
+		goto cleanup;
+	} else if (rc == -2) {
+		rc = xpath_get_tail_node(xpath, &tail_node);
+		if (rc == SR_ERR_INTERNAL) {
+			ERR_MSG("xpath get tail list node error");
+			goto cleanup;
+		}
+	}
 
-  if (operation == SR_OP_CREATED && new_value != NULL && old_value == NULL) {
-    if (new_value->type == SR_LIST_T) {
-      if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) {
-        plugin_operation = UBUS_OBJECT_CREATE;
-      } else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) {
-        plugin_operation = UBUS_METHOD_CREATE;
-      }
-    } else if (new_value->type == SR_STRING_T) {
-      if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) {
-        plugin_operation = UBUS_FILTER_CREATE;
-      }
-    }
-  }
-  if ((operation == SR_OP_MODIFIED || operation == SR_OP_CREATED) &&
-      new_value != NULL) {
-    if (new_value->type == SR_STRING_T) {
-      if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) {
-        plugin_operation = UBUS_OBJECT_MODIFY;
-      } else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) {
-        plugin_operation = UBUS_METHOD_MODIFY;
-      } else if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) {
-        plugin_operation = UBUS_FILTER_MODIFY;
-      }
-    }
-  }
-  if (operation == SR_OP_DELETED && old_value != NULL && new_value == NULL) {
-    if (old_value->type == SR_LIST_T || old_value->type == SR_STRING_T) {
-      if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) {
-        plugin_operation = UBUS_OBJECT_DELETE;
-      } else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) {
-        plugin_operation = UBUS_METHOD_DELETE;
-      } else if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) {
-        plugin_operation = UBUS_FILTER_DELETE;
-      }
-    }
-  }
+	if (operation == SR_OP_CREATED && new_value != NULL && old_value == NULL) {
+		if (new_value->type == SR_LIST_T) {
+			if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) {
+				plugin_operation = UBUS_OBJECT_CREATE;
+			} else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) {
+				plugin_operation = UBUS_METHOD_CREATE;
+			}
+		} else if (new_value->type == SR_STRING_T) {
+			if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) {
+				plugin_operation = UBUS_FILTER_CREATE;
+			}
+		}
+	}
+	if ((operation == SR_OP_MODIFIED || operation == SR_OP_CREATED) &&
+			new_value != NULL) {
+		if (new_value->type == SR_STRING_T) {
+			if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) {
+				plugin_operation = UBUS_OBJECT_MODIFY;
+			} else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) {
+				plugin_operation = UBUS_METHOD_MODIFY;
+			} else if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) {
+				plugin_operation = UBUS_FILTER_MODIFY;
+			}
+		}
+	}
+	if (operation == SR_OP_DELETED && old_value != NULL && new_value == NULL) {
+		if (old_value->type == SR_LIST_T || old_value->type == SR_STRING_T) {
+			if (strcmp(tail_node, YANG_UBUS_OBJECT) == 0) {
+				plugin_operation = UBUS_OBJECT_DELETE;
+			} else if (strcmp(tail_node, YANG_UBUS_METHOD) == 0) {
+				plugin_operation = UBUS_METHOD_DELETE;
+			} else if (strcmp(tail_node, YANG_UBUS_FILTER) == 0) {
+				plugin_operation = UBUS_FILTER_DELETE;
+			}
+		}
+	}
 
 cleanup:
-  free(tail_node);
-  return plugin_operation;
+	free(tail_node);
+	return plugin_operation;
 }
 
 /*
@@ -317,33 +312,33 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_create_ubus_object(context_t *context,
-                                           sr_val_t *value) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
-  CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
+static int generic_ubus_create_ubus_object(context_t *context, sr_val_t *value)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+	CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-  ubus_object_t *ubus_object = NULL;
-  rc = ubus_object_create(&ubus_object);
-  CHECK_RET_MSG(rc, cleanup, "allocation ubus_object is null");
+	ubus_object_t *ubus_object = NULL;
+	rc = ubus_object_create(&ubus_object);
+	CHECK_RET_MSG(rc, cleanup, "allocation ubus_object is null");
 
-  char *key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	char *key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  rc = ubus_object_set_name(ubus_object, key);
-  CHECK_RET_MSG(rc, cleanup, "set ubus object name error");
+	rc = ubus_object_set_name(ubus_object, key);
+	CHECK_RET_MSG(rc, cleanup, "set ubus object name error");
 
-  rc = context_add_ubus_object(context, ubus_object);
-  CHECK_RET_MSG(rc, cleanup, "add ubus object to list error");
+	rc = context_add_ubus_object(context, ubus_object);
+	CHECK_RET_MSG(rc, cleanup, "add ubus object to list error");
 
-  free(key);
-  return rc;
+	free(key);
+	return rc;
 
 cleanup:
-  ubus_object_destroy(&ubus_object);
-  free(key);
-  return rc;
+	ubus_object_destroy(&ubus_object);
+	free(key);
+	return rc;
 }
 
 /*
@@ -357,47 +352,45 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_modify_ubus_object(context_t *context,
-                                           sr_val_t *value) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
-  CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
+static int generic_ubus_modify_ubus_object(context_t *context, sr_val_t *value)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+	CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-  char *key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	char *key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  ubus_object_t *ubus_object = NULL;
-  rc = context_get_ubus_object(context, &ubus_object, key);
-  CHECK_RET_MSG(rc, cleanup, "get ubus object error");
+	ubus_object_t *ubus_object = NULL;
+	rc = context_get_ubus_object(context, &ubus_object, key);
+	CHECK_RET_MSG(rc, cleanup, "get ubus object error");
 
-  char *leaf = NULL;
-  rc = xpath_get_tail_node(value->xpath, &leaf);
-  CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
+	char *leaf = NULL;
+	rc = xpath_get_tail_node(value->xpath, &leaf);
+	CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
 
-  if (strcmp("yang-module", leaf) == 0) {
-    rc = ubus_object_unsubscribe(context->session, ubus_object);
-    CHECK_RET_MSG(rc, cleanup, "unsubscribe error");
+	if (strcmp("yang-module", leaf) == 0) {
+		rc = ubus_object_unsubscribe(context->session, ubus_object);
+		CHECK_RET_MSG(rc, cleanup, "unsubscribe error");
 
-    rc = ubus_object_set_yang_module(ubus_object, value->data.string_val);
-    CHECK_RET_MSG(rc, cleanup, "set ubus object yang module error");
+		rc = ubus_object_set_yang_module(ubus_object, value->data.string_val);
+		CHECK_RET_MSG(rc, cleanup, "set ubus object yang module error");
 
-    rc = ubus_object_state_data_subscribe(context->session, (void *)context,
-                                          ubus_object,
-                                          generic_ubus_operational_cb);
-    CHECK_RET_MSG(rc, cleanup, "module change subscribe error");
-    /*
-        rc = ubus_object_init_libyang_data(ubus_object, context->session);
-        CHECK_RET_MSG(rc, cleanup, "init libyang context error");
-    */
-  }
-  // name attribute is already set when createing ubus object
-  // because the name is the key for the ubus object list in YANG module
+		rc = ubus_object_state_data_subscribe(context->session, (void *)context, ubus_object, generic_ubus_operational_cb);
+		CHECK_RET_MSG(rc, cleanup, "module change subscribe error");
+		/*
+		   rc = ubus_object_init_libyang_data(ubus_object, context->session);
+		   CHECK_RET_MSG(rc, cleanup, "init libyang context error");
+		   */
+	}
+	// name attribute is already set when createing ubus object
+	// because the name is the key for the ubus object list in YANG module
 
 cleanup:
-  free(key);
-  free(leaf);
-  return rc;
+	free(key);
+	free(leaf);
+	return rc;
 }
 
 /*
@@ -409,26 +402,26 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_delete_ubus_object(context_t *context,
-                                           sr_val_t *value) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
-  CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
+static int generic_ubus_delete_ubus_object(context_t *context, sr_val_t *value)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+	CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-  char *key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	char *key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  if (value->type == SR_LIST_T) {
-    rc = context_delete_ubus_object(context, key);
-    CHECK_RET_MSG(rc, cleanup, "delete ubus object error");
-  }
-  // name and yang module can't be deleted they are mandatory
-  // they can only be modified
+	if (value->type == SR_LIST_T) {
+		rc = context_delete_ubus_object(context, key);
+		CHECK_RET_MSG(rc, cleanup, "delete ubus object error");
+	}
+	// name and yang module can't be deleted they are mandatory
+	// they can only be modified
 
 cleanup:
-  free(key);
-  return rc;
+	free(key);
+	return rc;
 }
 
 /*
@@ -440,42 +433,42 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_create_ubus_method(context_t *context,
-                                           sr_val_t *value) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
-  CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
+static int generic_ubus_create_ubus_method(context_t *context, sr_val_t *value)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+	CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-  char *key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	char *key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  ubus_object_t *ubus_object = NULL;
-  rc = context_get_ubus_object(context, &ubus_object, key);
-  CHECK_RET_MSG(rc, cleanup, "get ubus object error");
+	ubus_object_t *ubus_object = NULL;
+	rc = context_get_ubus_object(context, &ubus_object, key);
+	CHECK_RET_MSG(rc, cleanup, "get ubus object error");
 
-  free(key);
-  key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	free(key);
+	key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  ubus_method_t *ubus_method = NULL;
-  rc = ubus_method_create(&ubus_method);
-  CHECK_RET_MSG(rc, cleanup, "allocation ubus_method is null");
+	ubus_method_t *ubus_method = NULL;
+	rc = ubus_method_create(&ubus_method);
+	CHECK_RET_MSG(rc, cleanup, "allocation ubus_method is null");
 
-  rc = ubus_method_set_name(ubus_method, key);
-  CHECK_RET_MSG(rc, cleanup, "set ubus method name error");
+	rc = ubus_method_set_name(ubus_method, key);
+	CHECK_RET_MSG(rc, cleanup, "set ubus method name error");
 
-  rc = ubus_object_add_method(ubus_object, ubus_method);
-  CHECK_RET_MSG(rc, cleanup, "add ubus method to list error");
+	rc = ubus_object_add_method(ubus_object, ubus_method);
+	CHECK_RET_MSG(rc, cleanup, "add ubus method to list error");
 
-  free(key);
-  return rc;
+	free(key);
+	return rc;
 
 cleanup:
-  ubus_method_destroy(&ubus_method);
-  free(key);
-  return rc;
+	ubus_method_destroy(&ubus_method);
+	free(key);
+	return rc;
 }
 
 /*
@@ -489,41 +482,41 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_modify_ubus_method(context_t *context,
-                                           sr_val_t *value) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
-  CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
+static int generic_ubus_modify_ubus_method(context_t *context, sr_val_t *value)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+	CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-  char *key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	char *key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  ubus_object_t *ubus_object = NULL;
-  rc = context_get_ubus_object(context, &ubus_object, key);
-  CHECK_RET_MSG(rc, cleanup, "get ubus object error");
+	ubus_object_t *ubus_object = NULL;
+	rc = context_get_ubus_object(context, &ubus_object, key);
+	CHECK_RET_MSG(rc, cleanup, "get ubus object error");
 
-  free(key);
-  key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	free(key);
+	key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  ubus_method_t *ubus_method = NULL;
-  rc = ubus_object_get_method(ubus_object, &ubus_method, key);
-  CHECK_RET_MSG(rc, cleanup, "get ubus method error");
+	ubus_method_t *ubus_method = NULL;
+	rc = ubus_object_get_method(ubus_object, &ubus_method, key);
+	CHECK_RET_MSG(rc, cleanup, "get ubus method error");
 
-  char *leaf = NULL;
-  rc = xpath_get_tail_node(value->xpath, &leaf);
-  CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
-  if (strcmp("message", leaf) == 0) {
-    rc = ubus_method_set_message(ubus_method, value->data.string_val);
-    CHECK_RET_MSG(rc, cleanup, "set ubus method message error");
-  }
+	char *leaf = NULL;
+	rc = xpath_get_tail_node(value->xpath, &leaf);
+	CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
+	if (strcmp("message", leaf) == 0) {
+		rc = ubus_method_set_message(ubus_method, value->data.string_val);
+		CHECK_RET_MSG(rc, cleanup, "set ubus method message error");
+	}
 
 cleanup:
-  free(key);
-  free(leaf);
-  return rc;
+	free(key);
+	free(leaf);
+	return rc;
 }
 
 /*
@@ -535,46 +528,46 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_delete_ubus_method(context_t *context,
-                                           sr_val_t *value) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
-  CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
+static int generic_ubus_delete_ubus_method(context_t *context, sr_val_t *value)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+	CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-  char *leaf = NULL;
-  char *key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	char *leaf = NULL;
+	char *key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_OBJECT, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  ubus_object_t *ubus_object = NULL;
-  rc = context_get_ubus_object(context, &ubus_object, key);
-  CHECK_RET_MSG(rc, cleanup, "get ubus object error");
+	ubus_object_t *ubus_object = NULL;
+	rc = context_get_ubus_object(context, &ubus_object, key);
+	CHECK_RET_MSG(rc, cleanup, "get ubus object error");
 
-  free(key);
-  key = NULL;
-  rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
-  CHECK_RET_MSG(rc, cleanup, "allocation key is null");
+	free(key);
+	key = NULL;
+	rc = xpath_get_node_key_value(value->xpath, YANG_UBUS_METHOD, "name", &key);
+	CHECK_RET_MSG(rc, cleanup, "allocation key is null");
 
-  ubus_method_t *ubus_method = NULL;
-  rc = ubus_object_get_method(ubus_object, &ubus_method, key);
-  CHECK_RET_MSG(rc, cleanup, "get ubus method error");
+	ubus_method_t *ubus_method = NULL;
+	rc = ubus_object_get_method(ubus_object, &ubus_method, key);
+	CHECK_RET_MSG(rc, cleanup, "get ubus method error");
 
-  if (value->type == SR_LIST_T) {
-    rc = ubus_object_delete_method(ubus_object, key);
-    CHECK_RET_MSG(rc, cleanup, "delete ubus method error");
-  } else if (value->type == SR_STRING_T) {
-    rc = xpath_get_tail_node(value->xpath, &leaf);
-    CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
-    if (strcmp("message", leaf) == 0) {
-      rc = ubus_method_set_message(ubus_method, NULL);
-      CHECK_RET_MSG(rc, cleanup, "set ubus method message error");
-    }
-  }
+	if (value->type == SR_LIST_T) {
+		rc = ubus_object_delete_method(ubus_object, key);
+		CHECK_RET_MSG(rc, cleanup, "delete ubus method error");
+	} else if (value->type == SR_STRING_T) {
+		rc = xpath_get_tail_node(value->xpath, &leaf);
+		CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
+		if (strcmp("message", leaf) == 0) {
+			rc = ubus_method_set_message(ubus_method, NULL);
+			CHECK_RET_MSG(rc, cleanup, "set ubus method message error");
+		}
+	}
 
 cleanup:
-  free(key);
-  free(leaf);
-  return rc;
+	free(key);
+	free(leaf);
+	return rc;
 }
 
 /*
@@ -585,21 +578,22 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_update_filter(context_t *context, sr_val_t *value) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+static int generic_ubus_update_filter(context_t *context, sr_val_t *value)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
 
-  char *data = NULL;
+	char *data = NULL;
 
-  if (value != NULL) {
-    data = value->data.string_val;
-  }
+	if (value != NULL) {
+		data = value->data.string_val;
+	}
 
-  rc = context_set_ubus_object_filter_file_name(context, data);
-  CHECK_RET_MSG(rc, cleanup, "set ubus object filter file name error");
+	rc = context_set_ubus_object_filter_file_name(context, data);
+	CHECK_RET_MSG(rc, cleanup, "set ubus object filter file name error");
 
 cleanup:
-  return rc;
+	return rc;
 }
 
 /*
@@ -611,57 +605,61 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_set_context(context_t *context, sr_val_t *value) {
-  int rc = SR_ERR_OK;
-  CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
-  CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
+static int generic_ubus_set_context(context_t *context, sr_val_t *value)
+{
+	int rc = SR_ERR_OK;
+	CHECK_NULL_MSG(context, &rc, cleanup, "input argument context is null");
+	CHECK_NULL_MSG(value, &rc, cleanup, "input argument value is null");
 
-  char *tail_node = NULL;
-  char *key = NULL;
-  rc = xpath_get_tail_node(value->xpath, &tail_node);
-  CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
+	char *tail_node = NULL;
+	char *key = NULL;
+	rc = xpath_get_tail_node(value->xpath, &tail_node);
+	CHECK_RET_MSG(rc, cleanup, "xpath get tail node");
 
-  INF("%s", value->xpath);
+	INF("%s", value->xpath);
 
-  if (strncmp(YANG_UBUS_OBJECT, tail_node, strlen(YANG_UBUS_OBJECT)) == 0 &&
-      value->type == SR_LIST_T) {
-    INF_MSG("create ubus object");
-    rc = generic_ubus_create_ubus_object(context, value);
-    CHECK_RET_MSG(rc, cleanup, "create ubus object error");
-  } else if (strncmp(YANG_UBUS_METHOD, tail_node, strlen(YANG_UBUS_METHOD)) ==
-                 0 &&
-             value->type == SR_LIST_T) {
-    INF_MSG("create ubus method");
-    rc = generic_ubus_create_ubus_method(context, value);
-    CHECK_RET_MSG(rc, cleanup, "create ubus method error");
-  } else if (strncmp(tail_node, "yang-module", strlen(tail_node)) == 0 &&
-             value->type == SR_STRING_T) {
-    INF_MSG("modifying ubus object");
-    rc = generic_ubus_modify_ubus_object(context, value);
-    CHECK_RET_MSG(rc, cleanup, "modify ubus object error");
-  } else if (strncmp(tail_node, "message", strlen(tail_node)) == 0 &&
-             value->type == SR_STRING_T) {
-    INF_MSG("modify ubus method");
-    rc = generic_ubus_modify_ubus_method(context, value);
-    CHECK_RET_MSG(rc, cleanup, "modify ubus method error");
-  } else if (strncmp(tail_node, YANG_UBUS_FILTER, strlen(tail_node)) == 0 &&
-             value->type == SR_STRING_T) {
-    INF_MSG("modify ubus object fitler");
-    rc = generic_ubus_update_filter(context, value);
-    CHECK_RET_MSG(rc, cleanup, "modify ubus object filter error");
-  } else {
-    INF_MSG("ignoring the sysrepo value");
-  }
+	if (strncmp(YANG_UBUS_OBJECT, tail_node, strlen(YANG_UBUS_OBJECT)) == 0 &&
+	    value->type == SR_LIST_T) {
+		INF_MSG("create ubus object");
+		rc = generic_ubus_create_ubus_object(context, value);
+		CHECK_RET_MSG(rc, cleanup, "create ubus object error");
 
-  free(key);
-  free(tail_node);
-  return rc;
+	} else if (strncmp(YANG_UBUS_METHOD, tail_node, strlen(YANG_UBUS_METHOD)) == 0 &&
+		   value->type == SR_LIST_T) {
+		INF_MSG("create ubus method");
+		rc = generic_ubus_create_ubus_method(context, value);
+		CHECK_RET_MSG(rc, cleanup, "create ubus method error");
+
+	} else if (strncmp(tail_node, "yang-module", strlen(tail_node)) == 0 &&
+		   value->type == SR_STRING_T) {
+		INF_MSG("modifying ubus object");
+		rc = generic_ubus_modify_ubus_object(context, value);
+		CHECK_RET_MSG(rc, cleanup, "modify ubus object error");
+
+	} else if (strncmp(tail_node, "message", strlen(tail_node)) == 0 &&
+		   value->type == SR_STRING_T) {
+		INF_MSG("modify ubus method");
+		rc = generic_ubus_modify_ubus_method(context, value);
+		CHECK_RET_MSG(rc, cleanup, "modify ubus method error");
+	} else if (strncmp(tail_node, YANG_UBUS_FILTER, strlen(tail_node)) == 0 &&
+		   value->type == SR_STRING_T) {
+		INF_MSG("modify ubus object fitler");
+		rc = generic_ubus_update_filter(context, value);
+		CHECK_RET_MSG(rc, cleanup, "modify ubus object filter error");
+
+	} else {
+		INF_MSG("ignoring the sysrepo value");
+	}
+
+	free(key);
+	free(tail_node);
+	return rc;
 
 cleanup:
-  free(key);
-  free(tail_node);
+	free(key);
+	free(tail_node);
 
-  return rc;
+	return rc;
 }
 
 /*
@@ -677,265 +675,127 @@ cleanup:
  */
 static int
 generic_ubus_operational_cb(sr_session_ctx_t *session, const char *module_name,
-                            const char *path, const char *request_xpath,
-                            uint32_t request_id, struct lyd_node **parent,
-                            void *private_data) {
+			    const char *path, const char *request_xpath,
+			    uint32_t request_id, struct lyd_node **parent,
+			    void *private_data)
+{
 
-  /*
-  int rc = SR_ERR_OK;
-  context_t *context = (context_t *)private_data;
-  static uint64_t request = 0;
-  static ubus_object_t *ubus_object = NULL;
-  char *method_name = NULL;
-  char *ubus_object_name = NULL;
-  char *ubus_message = NULL;
-  static char *ubus_method_name = NULL;
-  json_object *parsed_json = NULL;
-  struct lyd_node *root = NULL;
-  struct lyd_node *root_child = NULL;
-  static struct lys_module *libyang_module = NULL;
-  sr_val_t *sysrepo_values = NULL;
-  char *result_json_data = NULL;
-  sr_conn_ctx_t *connection = NULL;
-  const struct ly_ctx *libyang_context = NULL;
+	int rc = SR_ERR_OK;
+	char module_whole[256] = {0};
+	ubus_object_t *ubus_object_iterator = NULL;
+	ubus_method_t *ubus_method_iterator = NULL;
+	ubus_object_t *ubus_object = NULL;
+	char *ubus_object_name = NULL;
+	context_t *context = (context_t *)private_data;
+	char *xpath_method_name = NULL;
+	char *result_json_data = NULL;
+	json_object *parsed_json = NULL;
+	struct lyd_node *root = NULL;
+	struct lyd_node *root_child = NULL;
+	static struct lys_module *libyang_module = NULL;
+	sr_conn_ctx_t *connection = NULL;
+	const struct ly_ctx *libyang_context = NULL;
 
-  CHECK_NULL_MSG(path, &rc, cleanup, "input argument cb_xpath is null");
-  CHECK_NULL_MSG(private_data, &rc, cleanup,
-                 "input argument private_ctx is null");
+	CHECK_NULL_MSG(path, &rc, cleanup, "input argument cb_xpath is null");
+	CHECK_NULL_MSG(private_data, &rc, cleanup, "input argument private_ctx is null");
 
-  INF("%s", path);
-  INF("%s", request_xpath);
+	INF("%s", path);
 
-  if (request != request_id) {
-    request = request_id;
-    ubus_method_name = NULL;
+	context_for_each_ubus_object(context, ubus_object_iterator)
+	{
+		char *ubus_object_module_name = NULL;
+		rc = ubus_object_get_yang_module(ubus_object_iterator, &ubus_object_module_name);
+		CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
+		if (strcmp(ubus_object_module_name, module_name) == 0) {
+			ubus_object = ubus_object_iterator;
+		}
+	}
 
-    ubus_object_t *ubus_object_it = NULL;
-    ubus_object = NULL;
-    context_for_each_ubus_object(context, ubus_object_it) {
-      char *yang_module = NULL;
-      rc = ubus_object_get_yang_module(ubus_object_it, &yang_module);
-      CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
-      INF("yang_module: %s module_name: %s", yang_module, module_name);
-      if (strncmp(yang_module, module_name, strlen(module_name)) == 0) {
-        INF_MSG("Tu sam prvi put");
-        ubus_object = ubus_object_it;
-        break;
-      }
-    }
+	if (ubus_object == NULL) {
+		goto cleanup;
+	}
 
-    connection = sr_session_get_connection(session);
-    CHECK_NULL_MSG(connection, &rc, cleanup, "sr_session_get_connection error");
+	INF("%s", request_xpath);
 
-    libyang_context = sr_get_context(connection);
-    CHECK_NULL_MSG(libyang_context, &rc, cleanup, "sr_get_context error");
+	connection = sr_session_get_connection(session);
+	CHECK_NULL_MSG(connection, &rc, cleanup, "sr_session_get_connection error");
 
-    libyang_module = (struct lys_module *)ly_ctx_get_module(
-        libyang_context, module_name, NULL, 1);
-    CHECK_NULL_MSG(libyang_module, &rc, cleanup, "ly_ctx_get_module error");
+	libyang_context = sr_get_context(connection);
+	CHECK_NULL_MSG(libyang_context, &rc, cleanup, "sr_get_context error");
 
-  } else if (ubus_object != NULL) {
-    rc = ubus_object_get_name(ubus_object, &ubus_object_name);
-    CHECK_RET_MSG(rc, cleanup, "get ubus object name error");
+	libyang_module = (struct lys_module *)ly_ctx_get_module(libyang_context, module_name, NULL, 1);
+	CHECK_NULL_MSG(libyang_module, &rc, cleanup, "ly_ctx_get_module error");
 
-    bool skip_ubus_object = false;
-    rc = context_filter_ubus_object(context, ubus_object_name,
-                                    &skip_ubus_object);
-    CHECK_RET_MSG(rc, cleanup, "filter ubus object error");
+	sprintf(module_whole, "/%s:*", module_name);
+	if (strcmp(request_xpath, module_whole) != 0) {
+		rc = xpath_get_tail_node(request_xpath, &xpath_method_name);
+		CHECK_RET_MSG(rc, cleanup, "xpath get tail node error");
+	}
 
-    if (skip_ubus_object == true) {
-      goto cleanup;
-    }
+	rc = ubus_object_get_name(ubus_object, &ubus_object_name);
+	CHECK_RET_MSG(rc, cleanup, "ubus method get name error");
 
-    root = lyd_new(NULL, libyang_module, module_name);
-    CHECK_NULL_MSG(root, &rc, cleanup, "libyang data root node");
+	root = lyd_new(NULL, libyang_module, module_name);
+	CHECK_NULL_MSG(root, &rc, cleanup, "libyang data root node");
 
-    rc = xpath_get_tail_node(path, &method_name);
-    if (rc == SR_ERR_INTERNAL) {
-      ERR_MSG("error geting tail node");
-    }
-    if (rc == -2 || rc == SR_ERR_INTERNAL) {
-      goto cleanup;
-    }
+	ubus_object_for_each_ubus_method(ubus_object, ubus_method_iterator)
+	{
+		char *ubus_method_name = NULL;
+		rc = ubus_method_get_name(ubus_method_iterator, &ubus_method_name);
+		CHECK_RET_MSG(rc, cleanup, "ubus method get name error");
 
-    ubus_method_t *ubus_method_it = NULL;
-    ubus_method_t *ubus_method = NULL;
-    ubus_object_for_each_ubus_method(ubus_object, ubus_method_it) {
-      INF("uom_name: %s | uom_message: %s", ubus_method_it->name,
-          ubus_method_it->message);
+		if ((xpath_method_name && (strcmp(xpath_method_name, ubus_method_name) == 0)) ||
+		    xpath_method_name == NULL)
+		{
+			char *ubus_message = NULL;
+			rc = ubus_method_get_message(ubus_method_iterator, &ubus_message);
+			CHECK_RET_MSG(rc, cleanup, "ubus method get method message error");
 
-      rc = ubus_method_get_name(ubus_method_it, &ubus_method_name);
-      CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
+			result_json_data = NULL;
+			rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+			CHECK_RET_MSG(rc, cleanup, "ubus call error");
 
-      if (strncmp(ubus_method_name, method_name, strlen(method_name)) == 0) {
-        ubus_method = ubus_method_it;
-        break;
-      }
-      ubus_method_name = NULL;
-    }
+			parsed_json = json_tokener_parse(result_json_data);
+			CHECK_NULL_MSG(parsed_json, &rc, cleanup, "tokener parser error");
 
-    if (ubus_method == NULL) {
-      INF("method %s not found for object %s", method_name, ubus_object_name);
-      rc = SR_ERR_OK;
-      goto cleanup;
-    }
+			root_child = lyd_new(root, libyang_module, ubus_method_name);
+			CHECK_NULL_MSG(root_child, &rc, cleanup, "libyang data root is null");
 
-    rc = ubus_method_get_message(ubus_method, &ubus_message);
-    CHECK_RET_MSG(rc, cleanup, "ubus method get method message error");
+			rc = generic_ubus_walk_json(parsed_json, libyang_module, root_child);
+			CHECK_RET_MSG(rc, cleanup, "generic ubus walk json error");
 
-    result_json_data = NULL;
-    rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message,
-                   ubus_get_response_cb, &result_json_data);
-    CHECK_RET_MSG(rc, cleanup, "ubus call error");
+			*parent = root;
 
-    parsed_json = json_tokener_parse(result_json_data);
-    CHECK_NULL_MSG(parsed_json, &rc, cleanup, "tokener parser error");
+			free(result_json_data);
+			result_json_data = NULL;
+			if (parsed_json != NULL) {
+				json_object_put(parsed_json);
+				parsed_json = NULL;
+			}
 
-    root_child = lyd_new(root, libyang_module, ubus_method->name);
-    CHECK_NULL_MSG(root_child, &rc, cleanup, "libyang data root is null");
+			if (xpath_method_name) {
+				break;
+			}
+		}
+	}
 
-    rc = generic_ubus_walk_json(parsed_json, libyang_module, root_child);
-    CHECK_RET_MSG(rc, cleanup, "generic ubus walk json error");
+	free(xpath_method_name);
 
-    if (lyd_validate(&root, LYD_OPT_DATA_NO_YANGLIB, NULL) != 0) {
-      ERR_MSG("error while validating libyang data tree");
-      sr_free_val(sysrepo_values);
-      goto cleanup;
-    }
-
-    *parent = root;
-    INF_MSG("Tu sam");
-  }
+	return rc;
 
 cleanup:
-  free(method_name);
-  free(result_json_data);
+	free(xpath_method_name);
+	free(result_json_data);
 
-  if (parsed_json != NULL) {
-    json_object_put(parsed_json);
-  }
+	if (parsed_json != NULL) {
+		json_object_put(parsed_json);
+	}
 
-  return rc;
-*/
-  int rc = SR_ERR_OK;
-  char module_whole[256] = {0};
-  ubus_object_t *ubus_object_iterator = NULL;
-  ubus_method_t *ubus_method_iterator = NULL;
-  ubus_object_t *ubus_object = NULL;
-  char *ubus_object_name = NULL;
-  context_t *context = (context_t *)private_data;
-  char *xpath_method_name = NULL;
-  char *result_json_data = NULL;
-  json_object *parsed_json = NULL;
-  struct lyd_node *root = NULL;
-  struct lyd_node *root_child = NULL;
-  static struct lys_module *libyang_module = NULL;
-  sr_conn_ctx_t *connection = NULL;
-  const struct ly_ctx *libyang_context = NULL;
+	if (root != NULL) {
+		lyd_free_withsiblings(root);
+	}
 
-  CHECK_NULL_MSG(path, &rc, cleanup, "input argument cb_xpath is null");
-  CHECK_NULL_MSG(private_data, &rc, cleanup,
-                 "input argument private_ctx is null");
-
-  INF("%s", path);
-
-  context_for_each_ubus_object(context, ubus_object_iterator) {
-    char *ubus_object_module_name = NULL;
-    rc = ubus_object_get_yang_module(ubus_object_iterator,
-                                     &ubus_object_module_name);
-    CHECK_RET_MSG(rc, cleanup, "ubus object get yang module error");
-    if (strcmp(ubus_object_module_name, module_name) == 0) {
-      ubus_object = ubus_object_iterator;
-    }
-  }
-
-  if (ubus_object == NULL) {
-    goto cleanup;
-  }
-
-  INF("%s", request_xpath);
-
-  connection = sr_session_get_connection(session);
-  CHECK_NULL_MSG(connection, &rc, cleanup, "sr_session_get_connection error");
-
-  libyang_context = sr_get_context(connection);
-  CHECK_NULL_MSG(libyang_context, &rc, cleanup, "sr_get_context error");
-
-  libyang_module = (struct lys_module *)ly_ctx_get_module(libyang_context,
-                                                          module_name, NULL, 1);
-  CHECK_NULL_MSG(libyang_module, &rc, cleanup, "ly_ctx_get_module error");
-
-  sprintf(module_whole, "/%s:*", module_name);
-  if (strcmp(request_xpath, module_whole) != 0) {
-    rc = xpath_get_tail_node(request_xpath, &xpath_method_name);
-    CHECK_RET_MSG(rc, cleanup, "xpath get tail node error");
-  }
-
-  rc = ubus_object_get_name(ubus_object, &ubus_object_name);
-  CHECK_RET_MSG(rc, cleanup, "ubus method get name error");
-
-  root = lyd_new(NULL, libyang_module, module_name);
-  CHECK_NULL_MSG(root, &rc, cleanup, "libyang data root node");
-
-  ubus_object_for_each_ubus_method(ubus_object, ubus_method_iterator) {
-    char *ubus_method_name = NULL;
-    rc = ubus_method_get_name(ubus_method_iterator, &ubus_method_name);
-    CHECK_RET_MSG(rc, cleanup, "ubus method get name error");
-
-    if ((xpath_method_name &&
-         (strcmp(xpath_method_name, ubus_method_name) == 0)) ||
-        xpath_method_name == NULL) {
-
-      char *ubus_message = NULL;
-      rc = ubus_method_get_message(ubus_method_iterator, &ubus_message);
-      CHECK_RET_MSG(rc, cleanup, "ubus method get method message error");
-
-      result_json_data = NULL;
-      rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message,
-                     ubus_get_response_cb, &result_json_data);
-      CHECK_RET_MSG(rc, cleanup, "ubus call error");
-
-      parsed_json = json_tokener_parse(result_json_data);
-      CHECK_NULL_MSG(parsed_json, &rc, cleanup, "tokener parser error");
-
-      root_child = lyd_new(root, libyang_module, ubus_method_name);
-      CHECK_NULL_MSG(root_child, &rc, cleanup, "libyang data root is null");
-
-      rc = generic_ubus_walk_json(parsed_json, libyang_module, root_child);
-      CHECK_RET_MSG(rc, cleanup, "generic ubus walk json error");
-
-      *parent = root;
-
-      free(result_json_data);
-      result_json_data = NULL;
-      if (parsed_json != NULL) {
-        json_object_put(parsed_json);
-        parsed_json = NULL;
-      }
-
-      if (xpath_method_name) {
-        break;
-      }
-    }
-  }
-
-  free(xpath_method_name);
-
-  return rc;
-
-cleanup:
-  free(xpath_method_name);
-  free(result_json_data);
-
-  if (parsed_json != NULL) {
-    json_object_put(parsed_json);
-  }
-
-  if (root != NULL) {
-    lyd_free_withsiblings(root);
-  }
-
-  return rc;
+	return rc;
 }
 
 /*
@@ -959,48 +819,47 @@ cleanup:
  *
  * @return error code.
  */
-static int generic_ubus_walk_json(json_object *object,
-                                  struct lys_module *module,
-                                  struct lyd_node *node) {
-  struct lyd_node *new_node = NULL;
-  int rc = SR_ERR_OK;
+static int generic_ubus_walk_json(json_object *object, struct lys_module *module, struct lyd_node *node)
+{
+	struct lyd_node *new_node = NULL;
+	int rc = SR_ERR_OK;
 
-  json_object_object_foreach(object, key, value) {
-    json_type type = json_object_get_type(value);
-    if (type == json_type_object) {
-      new_node = lyd_new(node, module, key);
-      CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
-      rc = generic_ubus_walk_json(value, module, new_node);
-      CHECK_RET_MSG(rc, cleanup, "error while waking tree");
-    } else if (type == json_type_array) {
-      size_t json_array_length = json_object_array_length(value);
-      for (size_t i = 0; i < json_array_length; i++) {
-        json_object *entry = json_object_array_get_idx(value, i);
-        json_type type = json_object_get_type(entry);
-        if (type == json_type_array || type == json_type_object) {
-          new_node = lyd_new(node, module, key);
-          CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
-          rc = generic_ubus_walk_json(entry, module, new_node);
-          CHECK_RET_MSG(rc, cleanup, "error while waking tree");
-        } else {
-          new_node =
-              lyd_new_leaf(node, module, key, json_object_get_string(entry));
-          CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new leaf error");
-        }
-      }
-    } else {
-      new_node = lyd_new_leaf(node, module, key, json_object_get_string(value));
-      CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new leaf error");
-    }
-  }
+	json_object_object_foreach(object, key, value)
+	{
+		json_type type = json_object_get_type(value);
+		if (type == json_type_object) {
+			new_node = lyd_new(node, module, key);
+			CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
+			rc = generic_ubus_walk_json(value, module, new_node);
+			CHECK_RET_MSG(rc, cleanup, "error while waking tree");
+		} else if (type == json_type_array) {
+			size_t json_array_length = json_object_array_length(value);
+			for (size_t i = 0; i < json_array_length; i++) {
+				json_object *entry = json_object_array_get_idx(value, i);
+				json_type type = json_object_get_type(entry);
+				if (type == json_type_array || type == json_type_object) {
+					new_node = lyd_new(node, module, key);
+					CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new node error");
+					rc = generic_ubus_walk_json(entry, module, new_node);
+					CHECK_RET_MSG(rc, cleanup, "error while waking tree");
+				} else {
+					new_node = lyd_new_leaf(node, module, key, json_object_get_string(entry));
+					CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new leaf error");
+				}
+			}
+		} else {
+			new_node = lyd_new_leaf(node, module, key, json_object_get_string(value));
+			CHECK_NULL_MSG(new_node, &rc, cleanup, "libyang data new leaf error");
+		}
+	}
 
-  return rc;
+	return rc;
 
 cleanup:
-  if (new_node != NULL) {
-    lyd_free_withsiblings(new_node);
-  }
-  return rc;
+	if (new_node != NULL) {
+		lyd_free_withsiblings(new_node);
+	}
+	return rc;
 }
 
 /*
@@ -1016,26 +875,26 @@ cleanup:
  * @return error code.
  */
 int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name,
-                           const char *xpath, sr_event_t event,
-                           uint32_t request_id, void *private_data) {
-  int rc = SR_ERR_OK;
-  context_t *context = (context_t *)private_data;
+			   const char *xpath, sr_event_t event, uint32_t request_id,
+			   void *private_data)
+{
+	int rc = SR_ERR_OK;
+	context_t *context = (context_t *)private_data;
 
-  INF("%d", event);
+	INF("%d", event);
 
-  if (SR_EV_DONE == event) {
-    /* copy running datastore to startup */
-    rc = sr_copy_config(context->startup_session, YANG_MODEL, SR_DS_RUNNING,
-                        0, 0);
-    if (SR_ERR_OK != rc) {
-      WRN_MSG("Failed to copy running datastore to startup");
-      return rc;
-    }
-    return SR_ERR_OK;
-  }
+	if (SR_EV_DONE == event) {
+		/* copy running datastore to startup */
+		rc = sr_copy_config(context->startup_session, YANG_MODEL, SR_DS_RUNNING, 0, 0);
+		if (SR_ERR_OK != rc) {
+			WRN_MSG("Failed to copy running datastore to startup");
+			return rc;
+		}
+		return SR_ERR_OK;
+	}
 
-  rc = generic_ubus_apply_module_changes(context, module_name, session);
-  return rc;
+	rc = generic_ubus_apply_module_changes(context, module_name, session);
+	return rc;
 }
 
 /*
@@ -1051,112 +910,104 @@ int generic_ubus_change_cb(sr_session_ctx_t *session, const char *module_name,
  *
  * @return error code.
  */
-int generic_ubus_ubus_call_rpc_cb(sr_session_ctx_t *session,
-                                  const char *op_path, const sr_val_t *input,
-                                  const size_t input_cnt, sr_event_t event,
-                                  uint32_t request_id, sr_val_t **output,
-                                  size_t *output_cnt, void *private_data) {
-  int rc = SR_ERR_OK;
-  char *tail_node = NULL;
-  char *ubus_object_name = NULL;
-  char *ubus_method_name = NULL;
-  char *ubus_message = NULL;
-  sr_val_t *result = NULL;
-  size_t count = 0;
-  char ubus_invoke_string[256 + 1] = {0};
-  char *result_json_data = NULL;
-  context_t *context = (context_t *)private_data;
-  const char *ubus_object_filtered_out_message = "Ubus object is filtered out";
+int generic_ubus_ubus_call_rpc_cb(sr_session_ctx_t *session, const char *op_path,
+				  const sr_val_t *input, const size_t input_cnt,
+				  sr_event_t event, uint32_t request_id,
+				  sr_val_t **output, size_t *output_cnt, void *private_data)
+{
+	int rc = SR_ERR_OK;
+	char *tail_node = NULL;
+	char *ubus_object_name = NULL;
+	char *ubus_method_name = NULL;
+	char *ubus_message = NULL;
+	sr_val_t *result = NULL;
+	size_t count = 0;
+	char ubus_invoke_string[256 + 1] = {0};
+	char *result_json_data = NULL;
+	context_t *context = (context_t *)private_data;
+	const char *ubus_object_filtered_out_message = "Ubus object is filtered out";
 
-  *output_cnt = 0;
+	*output_cnt = 0;
 
-  INF("%d", input_cnt);
+	INF("%d", input_cnt);
 
-  for (int i = 0; i < input_cnt; i++) {
-    rc = xpath_get_tail_node(input[i].xpath, &tail_node);
-    CHECK_RET_MSG(rc, cleanup, "get tail node error");
+	for (int i = 0; i < input_cnt; i++) {
+		rc = xpath_get_tail_node(input[i].xpath, &tail_node);
+		CHECK_RET_MSG(rc, cleanup, "get tail node error");
 
-    if (strcmp(RPC_UBUS_OBJECT, tail_node) == 0) {
-      ubus_object_name = input[i].data.string_val;
-    } else if (strcmp(RPC_UBUS_METHOD, tail_node) == 0) {
-      ubus_method_name = input[i].data.string_val;
-    } else if (strcmp(RPC_UBUS_METHOD_MESSAGE, tail_node) == 0) {
-      ubus_message = input[i].data.string_val;
-    }
+		if (strcmp(RPC_UBUS_OBJECT, tail_node) == 0) {
+			ubus_object_name = input[i].data.string_val;
+		} else if (strcmp(RPC_UBUS_METHOD, tail_node) == 0) {
+			ubus_method_name = input[i].data.string_val;
+		} else if (strcmp(RPC_UBUS_METHOD_MESSAGE, tail_node) == 0) {
+			ubus_message = input[i].data.string_val;
+		}
 
-    uint8_t last = (i + 1) >= input_cnt;
+		uint8_t last = (i + 1) >= input_cnt;
 
-    if ((strstr(tail_node, RPC_UBUS_INVOCATION) != NULL &&
-         ubus_method_name != NULL && ubus_object_name != NULL) ||
-        last == 1) {
-      bool skip_ubus_object = false;
-      rc = context_filter_ubus_object(context, ubus_object_name,
-                                      &skip_ubus_object);
-      CHECK_RET_MSG(rc, cleanup, "filter ubus object error");
+		if ((strstr(tail_node, RPC_UBUS_INVOCATION) != NULL &&
+		    ubus_method_name != NULL && ubus_object_name != NULL) || last == 1)
+		{
+			bool skip_ubus_object = false;
+			rc = context_filter_ubus_object(context, ubus_object_name, &skip_ubus_object);
+			CHECK_RET_MSG(rc, cleanup, "filter ubus object error");
 
-      INF("%d", skip_ubus_object);
-      if (skip_ubus_object == false) {
-        rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message,
-                       ubus_get_response_cb, &result_json_data);
-        CHECK_RET_MSG(rc, cleanup, "ubus call error");
-      } else {
-        result_json_data =
-            calloc(1, strlen(ubus_object_filtered_out_message) + 1);
-        CHECK_NULL_MSG(result_json_data, &rc, cleanup,
-                       "result json data alloc error");
-        strcpy(result_json_data, ubus_object_filtered_out_message);
-      }
+			INF("%d", skip_ubus_object);
+			if (skip_ubus_object == false) {
+				rc = ubus_call(ubus_object_name, ubus_method_name, ubus_message, ubus_get_response_cb, &result_json_data);
+				CHECK_RET_MSG(rc, cleanup, "ubus call error");
+			} else {
+				result_json_data = calloc(1, strlen(ubus_object_filtered_out_message) + 1);
+				CHECK_NULL_MSG(result_json_data, &rc, cleanup, "result json data alloc error");
+				strcpy(result_json_data, ubus_object_filtered_out_message);
+			}
 
-      rc = sr_realloc_values(count, count + 2, &result);
-      SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
+			rc = sr_realloc_values(count, count + 2, &result);
+			SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
 
-      memset(ubus_invoke_string, 0, 256 + 1);
-      if (ubus_message != NULL) {
-        snprintf(ubus_invoke_string, 256 + 1, "%s %s %s", ubus_object_name,
-                 ubus_method_name, ubus_message);
-      } else {
-        snprintf(ubus_invoke_string, 256 + 1, "%s %s %s", ubus_object_name,
-                 ubus_method_name, JSON_EMPTY_OBJECT);
-      }
+			memset(ubus_invoke_string, 0, 256 + 1);
+			if (ubus_message != NULL) {
+				snprintf(ubus_invoke_string, 256 + 1, "%s %s %s", ubus_object_name, ubus_method_name, ubus_message);
+			} else {
+				snprintf(ubus_invoke_string, 256 + 1, "%s %s %s", ubus_object_name, ubus_method_name, JSON_EMPTY_OBJECT);
+			}
 
-      rc = sr_val_build_xpath(&result[count], RPC_UBUS_INVOCATION_XPATH,
-                              ubus_invoke_string);
-      SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+			rc = sr_val_build_xpath(&result[count], RPC_UBUS_INVOCATION_XPATH, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
 
-      rc = sr_val_set_str_data(&result[count], SR_STRING_T, ubus_invoke_string);
-      SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+			rc = sr_val_set_str_data(&result[count], SR_STRING_T, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
 
-      count++;
+			count++;
 
-      rc = sr_val_build_xpath(&result[count], RPC_UBUS_RESPONSE_XPATH,
-                              ubus_invoke_string);
-      SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+			rc = sr_val_build_xpath(&result[count], RPC_UBUS_RESPONSE_XPATH, ubus_invoke_string);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
 
-      rc = sr_val_set_str_data(&result[count], SR_STRING_T, result_json_data);
-      SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+			rc = sr_val_set_str_data(&result[count], SR_STRING_T, result_json_data);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
 
-      free(result_json_data);
-      result_json_data = NULL;
+			free(result_json_data);
+			result_json_data = NULL;
 
-      count++;
-    }
-    free(tail_node);
-    tail_node = NULL;
-  }
+			count++;
+		}
+		free(tail_node);
+		tail_node = NULL;
+	}
 
-  *output_cnt = count;
-  *output = result;
+	*output_cnt = count;
+	*output = result;
 
-  return rc;
+	return rc;
 
 cleanup:
-  free(tail_node);
-  free(result_json_data);
-  if (result != NULL) {
-    sr_free_values(result, count);
-  }
+	free(tail_node);
+	free(result_json_data);
+	if (result != NULL) {
+		sr_free_values(result, count);
+	}
 
-  return rc;
+	return rc;
 }
 
 /*
@@ -1173,80 +1024,72 @@ cleanup:
  *
  * @return error code.
  */
-int generic_ubus_module_install_rpc_cb(sr_session_ctx_t *session,
-                                       const char *op_path,
-                                       const sr_val_t *input,
-                                       const size_t input_cnt, sr_event_t event,
-                                       uint32_t request_id, sr_val_t **output,
-                                       size_t *output_cnt, void *private_data) {
-  int rc = SR_ERR_OK;
-  int src = 0;
-  char *path_to_module = NULL;
-  char command[256 + 1] = {0};
-  char return_message[256 + 1] = {0};
-  sr_val_t *return_values = NULL;
-  size_t count = 0;
-  sr_conn_ctx_t *connection = NULL;
+int generic_ubus_module_install_rpc_cb(sr_session_ctx_t *session, const char *op_path,
+				       const sr_val_t *input, const size_t input_cnt,
+				       sr_event_t event, uint32_t request_id,
+				       sr_val_t **output, size_t *output_cnt, void *private_data)
+{
+	int rc = SR_ERR_OK;
+	int src = 0;
+	char *path_to_module = NULL;
+	char command[256 + 1] = {0};
+	char return_message[256 + 1] = {0};
+	sr_val_t *return_values = NULL;
+	size_t count = 0;
+	sr_conn_ctx_t *connection = NULL;
 
-  *output_cnt = 0;
+	*output_cnt = 0;
 
-  connection = sr_session_get_connection(session);
-  CHECK_NULL_MSG(connection, &rc, cleanup, "session get connection error");
+	connection = sr_session_get_connection(session);
+	CHECK_NULL_MSG(connection, &rc, cleanup, "session get connection error");
 
-  for (size_t i = 0; i < input_cnt; i++) {
-    memset(return_message, 0, 256 + 1);
-    memset(command, 0, 256 + 1);
+	for (size_t i = 0; i < input_cnt; i++) {
+		memset(return_message, 0, 256 + 1);
+		memset(command, 0, 256 + 1);
 
-    path_to_module = input[i].data.string_val;
-    INF("%s", path_to_module);
+		path_to_module = input[i].data.string_val;
+		INF("%s", path_to_module);
 
-    rc = sr_install_module(connection, path_to_module, NULL, NULL, 0);
+		rc = sr_install_module(connection, path_to_module, NULL, NULL, 0);
 
-    if (rc == 0) {
-      snprintf(return_message, 256 + 1, "Installation of module %s succeeded",
-               path_to_module);
-    } else {
-      snprintf(return_message, 256 + 1,
-               "Installation of module %s failed, error: %d", path_to_module,
-               src);
-    }
-    rc = sr_realloc_values(count, count + 2, &return_values);
-    SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
+		if (rc == 0) {
+			snprintf(return_message, 256 + 1, "Installation of module %s succeeded", path_to_module);
+		} else {
+			snprintf(return_message, 256 + 1, "Installation of module %s failed, error: %d", path_to_module, src);
+		}
+		rc = sr_realloc_values(count, count + 2, &return_values);
+		SR_CHECK_RET(rc, cleanup, "sr new values error: %s", sr_strerror(rc));
 
-    rc = sr_val_build_xpath(&return_values[count], RPC_MODULE_PATH_XPATH,
-                            path_to_module);
-    SR_CHECK_RET(rc, cleanup, "sr set xpath for value error: %s",
-                 sr_strerror(rc));
+		rc = sr_val_build_xpath(&return_values[count], RPC_MODULE_PATH_XPATH, path_to_module);
+		SR_CHECK_RET(rc, cleanup, "sr set xpath for value error: %s", sr_strerror(rc));
 
-    rc =
-        sr_val_set_str_data(&return_values[count], SR_STRING_T, path_to_module);
-    SR_CHECK_RET(rc, cleanup, "sr set string value error: %s", sr_strerror(rc));
+		rc = sr_val_set_str_data(&return_values[count], SR_STRING_T, path_to_module);
+		SR_CHECK_RET(rc, cleanup, "sr set string value error: %s", sr_strerror(rc));
 
-    count++;
+		count++;
 
-    rc = sr_val_build_xpath(&return_values[count], RPC_MODULE_RESPONSE_XPATH,
-                            path_to_module);
-    SR_CHECK_RET(rc, cleanup, "sr set xpath for value error: %s",
-                 sr_strerror(rc));
+		rc = sr_val_build_xpath(&return_values[count], RPC_MODULE_RESPONSE_XPATH, path_to_module);
+		SR_CHECK_RET(rc, cleanup, "sr set xpath for value error: %s", sr_strerror(rc));
 
-    rc =
-        sr_val_set_str_data(&return_values[count], SR_STRING_T, return_message);
-    SR_CHECK_RET(rc, cleanup, "sr set string value error: %s", sr_strerror(rc));
+		rc = sr_val_set_str_data(&return_values[count], SR_STRING_T, return_message);
+		SR_CHECK_RET(rc, cleanup, "sr set string value error: %s", sr_strerror(rc));
 
-    count++;
-  }
-  *output_cnt = count;
-  *output = return_values;
+		count++;
+	}
+	*output_cnt = count;
+	*output = return_values;
 
 cleanup:
-  return rc;
+	return rc;
 }
 
 void generic_ubus_event_notif_cb(sr_session_ctx_t *session,
-                                 const sr_ev_notif_type_t notif_type,
-                                 const char *path, const sr_val_t *values,
-                                 const size_t values_cnt, time_t timestamp,
-                                 void *private_data) {}
+				 const sr_ev_notif_type_t notif_type,
+				 const char *path, const sr_val_t *values,
+				 const size_t values_cnt, time_t timestamp, void *private_data)
+{
+	return;
+}
 
 /*
  * @brief Callback for feature enable/disable RPC.
@@ -1262,110 +1105,100 @@ void generic_ubus_event_notif_cb(sr_session_ctx_t *session,
  *
  * @return error code.
  */
-int generic_ubus_feature_update_rpc_cb(sr_session_ctx_t *session,
-                                       const char *op_path,
-                                       const sr_val_t *input,
-                                       const size_t input_cnt, sr_event_t event,
-                                       uint32_t request_id, sr_val_t **output,
-                                       size_t *output_cnt, void *private_data) {
-  int rc = SR_ERR_OK;
-  int src = 0;
-  char *tail_node = NULL;
-  uint8_t enable_feature = 0;
-  char *yang_module_name = NULL;
-  char *feature_name = NULL;
-  sr_val_t *return_values = NULL;
-  size_t count = 0;
-  sr_conn_ctx_t *connection = NULL;
+int generic_ubus_feature_update_rpc_cb(sr_session_ctx_t *session, const char *op_path,
+				       const sr_val_t *input, const size_t input_cnt,
+				       sr_event_t event, uint32_t request_id,
+				       sr_val_t **output, size_t *output_cnt, void *private_data)
+{
+	int rc = SR_ERR_OK;
+	int src = 0;
+	char *tail_node = NULL;
+	uint8_t enable_feature = 0;
+	char *yang_module_name = NULL;
+	char *feature_name = NULL;
+	sr_val_t *return_values = NULL;
+	size_t count = 0;
+	sr_conn_ctx_t *connection = NULL;
 
-  char return_message[256 + 1] = {0};
-  char feature_invoke[256 + 1] = {0};
+	char return_message[256 + 1] = {0};
+	char feature_invoke[256 + 1] = {0};
 
-  uint8_t make_sysrepoctl_call = 0;
-  *output_cnt = 0;
+	uint8_t make_sysrepoctl_call = 0;
+	*output_cnt = 0;
 
-  connection = sr_session_get_connection(session);
-  CHECK_NULL_MSG(connection, &rc, cleanup, "session get connection error");
+	connection = sr_session_get_connection(session);
+	CHECK_NULL_MSG(connection, &rc, cleanup, "session get connection error");
 
-  for (size_t i = 0; i < input_cnt; i++) {
-    rc = xpath_get_tail_node(input[i].xpath, &tail_node);
-    CHECK_RET_MSG(rc, cleanup, "get tail node error");
+	for (size_t i = 0; i < input_cnt; i++) {
+		rc = xpath_get_tail_node(input[i].xpath, &tail_node);
+		CHECK_RET_MSG(rc, cleanup, "get tail node error");
 
-    if (strcmp("module-name", tail_node) == 0) {
-      yang_module_name = input[i].data.string_val;
-    } else if (strcmp("feature-name", tail_node) == 0) {
-      feature_name = input[i].data.string_val;
-    } else if (strcmp("enable", tail_node) == 0) {
-      enable_feature = 1;
-      make_sysrepoctl_call = 1;
-    } else if (strcmp("disable", tail_node) == 0) {
-      enable_feature = 0;
-      make_sysrepoctl_call = 1;
-    }
+		if (strcmp("module-name", tail_node) == 0) {
+			yang_module_name = input[i].data.string_val;
+		} else if (strcmp("feature-name", tail_node) == 0) {
+			feature_name = input[i].data.string_val;
+		} else if (strcmp("enable", tail_node) == 0) {
+			enable_feature = 1;
+			make_sysrepoctl_call = 1;
+		} else if (strcmp("disable", tail_node) == 0) {
+			enable_feature = 0;
+			make_sysrepoctl_call = 1;
+		}
 
-    if (make_sysrepoctl_call == 1) {
+		if (make_sysrepoctl_call == 1) {
 
-      if (enable_feature) {
-        rc = sr_enable_module_feature(connection, yang_module_name,
-                                      feature_name);
-      } else {
-        rc = sr_disable_module_feature(connection, yang_module_name,
-                                       feature_name);
-      }
-      if (rc == 0) {
-        snprintf(return_message, 256 + 1,
-                 "%s feature %s in module %s succeeded.",
-                 (enable_feature == 1) ? "Enabeling" : "Disabeling",
-                 feature_name, yang_module_name);
-      } else {
-        snprintf(return_message, 256 + 1,
-                 "%s feature %s in module %s failed. Error: %d.",
-                 (enable_feature == 1) ? "Enabeling" : "Disabeling",
-                 feature_name, yang_module_name, src);
-      }
+			if (enable_feature) {
+				rc = sr_enable_module_feature(connection, yang_module_name,
+						feature_name);
+			} else {
+				rc = sr_disable_module_feature(connection, yang_module_name,
+						feature_name);
+			}
+			if (rc == 0) {
+				snprintf(return_message, 256 + 1, "%s feature %s in module %s succeeded.",
+					 (enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name);
+			} else {
+				snprintf(return_message, 256 + 1, "%s feature %s in module %s failed. Error: %d.",
+					 (enable_feature == 1) ? "Enabeling" : "Disabeling", feature_name, yang_module_name, src);
+			}
 
-      snprintf(feature_invoke, 256 + 1, "%s %s", yang_module_name,
-               feature_name);
+			snprintf(feature_invoke, 256 + 1, "%s %s", yang_module_name, feature_name);
 
-      rc = sr_realloc_values(count, count + 2, &return_values);
-      SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
+			rc = sr_realloc_values(count, count + 2, &return_values);
+			SR_CHECK_RET(rc, cleanup, "sr realloc values error: %s", sr_strerror(rc));
 
-      rc = sr_val_build_xpath(&return_values[count],
-                              RPC_FEATURE_INVOCATION_XPATH, feature_invoke);
-      SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+			rc = sr_val_build_xpath(&return_values[count], RPC_FEATURE_INVOCATION_XPATH, feature_invoke);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
 
-      rc = sr_val_set_str_data(&return_values[count], SR_STRING_T,
-                               feature_invoke);
-      SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+			rc = sr_val_set_str_data(&return_values[count], SR_STRING_T, feature_invoke);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
 
-      count++;
+			count++;
 
-      rc = sr_val_build_xpath(&return_values[count], RPC_FEATURE_RESPONSE_XPATH,
-                              feature_invoke);
-      SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
+			rc = sr_val_build_xpath(&return_values[count], RPC_FEATURE_RESPONSE_XPATH, feature_invoke);
+			SR_CHECK_RET(rc, cleanup, "sr value set xpath: %s", sr_strerror(rc));
 
-      rc = sr_val_set_str_data(&return_values[count], SR_STRING_T,
-                               return_message);
-      SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
+			rc = sr_val_set_str_data(&return_values[count], SR_STRING_T, return_message);
+			SR_CHECK_RET(rc, cleanup, "sr value set str data: %s", sr_strerror(rc));
 
-      count++;
-      make_sysrepoctl_call = 0;
-    }
-    free(tail_node);
-    tail_node = NULL;
-  }
+			count++;
+			make_sysrepoctl_call = 0;
+		}
+		free(tail_node);
+		tail_node = NULL;
+	}
 
-  *output_cnt = count;
-  *output = return_values;
+	*output_cnt = count;
+	*output = return_values;
 
-  return rc;
+	return rc;
 
 cleanup:
-  free(tail_node);
-  if (return_values != NULL) {
-    sr_free_values(return_values, count);
-  }
-  return rc;
+	free(tail_node);
+	if (return_values != NULL) {
+		sr_free_values(return_values, count);
+	}
+	return rc;
 }
 
 
@@ -1383,76 +1216,69 @@ cleanup:
  * @return error code.
  *
  */
-int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx) {
-  INF("%s", __func__);
+int sr_plugin_init_cb(sr_session_ctx_t *session, void **private_ctx)
+{
+	INF("%s", __func__);
 
-  int rc = SR_ERR_OK;
-  context_t *context = NULL;
-  rc = context_create(&context);
-  SR_CHECK_RET(rc, cleanup, "%s: context_create: %s", __func__, sr_strerror);
+	int rc = SR_ERR_OK;
+	context_t *context = NULL;
+	rc = context_create(&context);
+	SR_CHECK_RET(rc, cleanup, "%s: context_create: %s", __func__, sr_strerror);
 
-  rc = context_set_session(context, session);
-  SR_CHECK_RET(rc, cleanup, "%s: context_create: %s", __func__, sr_strerror);
+	rc = context_set_session(context, session);
+	SR_CHECK_RET(rc, cleanup, "%s: context_create: %s", __func__, sr_strerror);
 
-  *private_ctx = context;
+	*private_ctx = context;
 
-  sr_conn_ctx_t *startup_connection = NULL;
-  rc = sr_connect(SR_CONN_DEFAULT, &startup_connection);
-  CHECK_RET(rc, cleanup, "Error by sr_connect: %s", sr_strerror(rc));
+	sr_conn_ctx_t *startup_connection = NULL;
+	rc = sr_connect(SR_CONN_DEFAULT, &startup_connection);
+	CHECK_RET(rc, cleanup, "Error by sr_connect: %s", sr_strerror(rc));
 
-  sr_session_ctx_t *startup_session = NULL;
-  rc = sr_session_start(startup_connection, SR_DS_STARTUP, &startup_session);
-  CHECK_RET(rc, cleanup, "Error by sr_session_start: %s", sr_strerror(rc));
+	sr_session_ctx_t *startup_session = NULL;
+	rc = sr_session_start(startup_connection, SR_DS_STARTUP, &startup_session);
+	CHECK_RET(rc, cleanup, "Error by sr_session_start: %s", sr_strerror(rc));
 
-  rc = context_set_startup_connection(context, startup_connection);
-  SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
+	rc = context_set_startup_connection(context, startup_connection);
+	SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
 
-  rc = context_set_startup_session(context, startup_session);
-  SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
+	rc = context_set_startup_session(context, startup_session);
+	SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
 
-  // load startup datastore
-  rc = generic_ubus_load_startup_datastore(context);
-  SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
+	// load startup datastore
+	rc = generic_ubus_load_startup_datastore(context);
+	SR_CHECK_RET(rc, cleanup, "context error: %s", sr_strerror(rc));
 
-  INF_MSG("Subcribing to module change");
-  rc = sr_module_change_subscribe(session, YANG_MODEL, NULL,
-                                  generic_ubus_change_cb, *private_ctx, 0,
-                                  SR_SUBSCR_DEFAULT, &context->subscription);
-  SR_CHECK_RET(rc, cleanup, "initialization error: %s", sr_strerror(rc));
+	INF_MSG("Subcribing to module change");
+	rc = sr_module_change_subscribe(session, YANG_MODEL, NULL, generic_ubus_change_cb, *private_ctx, 0, SR_SUBSCR_DEFAULT, &context->subscription);
+	SR_CHECK_RET(rc, cleanup, "initialization error: %s", sr_strerror(rc));
 
-  INF_MSG("Subscribing to ubus call rpc");
-  rc = sr_rpc_subscribe(session, "/" YANG_MODEL ":ubus-call",
-                        generic_ubus_ubus_call_rpc_cb, *private_ctx, 0,
-                        SR_SUBSCR_CTX_REUSE, &context->subscription);
-  SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
+	INF_MSG("Subscribing to ubus call rpc");
+	rc = sr_rpc_subscribe(session, "/" YANG_MODEL ":ubus-call", generic_ubus_ubus_call_rpc_cb, *private_ctx, 0, SR_SUBSCR_CTX_REUSE, &context->subscription);
+	SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
 
-  INF_MSG("Subscribing to module install rpc");
-  rc = sr_rpc_subscribe(session, "/" YANG_MODEL ":module-install",
-                        generic_ubus_module_install_rpc_cb, NULL, 0,
-                        SR_SUBSCR_CTX_REUSE, &context->subscription);
-  SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
+	INF_MSG("Subscribing to module install rpc");
+	rc = sr_rpc_subscribe(session, "/" YANG_MODEL ":module-install", generic_ubus_module_install_rpc_cb, NULL, 0, SR_SUBSCR_CTX_REUSE, &context->subscription);
+	SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
 
-  INF_MSG("Subscribing to feature update rpc");
-  rc = sr_rpc_subscribe(session, "/" YANG_MODEL ":feature-update",
-                        generic_ubus_feature_update_rpc_cb, NULL, 0,
-                        SR_SUBSCR_CTX_REUSE, &context->subscription);
-  SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
+	INF_MSG("Subscribing to feature update rpc");
+	rc = sr_rpc_subscribe(session, "/" YANG_MODEL ":feature-update", generic_ubus_feature_update_rpc_cb, NULL, 0, SR_SUBSCR_CTX_REUSE, &context->subscription);
+	SR_CHECK_RET(rc, cleanup, "rpc subscription error: %s", sr_strerror(rc));
 
-  /*
-    // TODO: register for each new YANG module individually, maybe unecessary
-    INF_MSG("Subscribing to event notification");
-    rc = sr_event_notif_subscribe(session, NULL, NULL, (time_t){0}, (time_t){0},
-                                  generic_ubus_event_notif_cb, *private_ctx,
-                                  SR_SUBSCR_CTX_REUSE, &context->subscription);
-    SR_CHECK_RET(rc, cleanup, "feature subscription error: %s",
-    sr_strerror(rc));
-  */
-  INF_MSG("Succesfull init");
-  return SR_ERR_OK;
+	/*
+	// TODO: register for each new YANG module individually, maybe unecessary
+	INF_MSG("Subscribing to event notification");
+	rc = sr_event_notif_subscribe(session, NULL, NULL, (time_t){0}, (time_t){0},
+	generic_ubus_event_notif_cb, *private_ctx,
+	SR_SUBSCR_CTX_REUSE, &context->subscription);
+	SR_CHECK_RET(rc, cleanup, "feature subscription error: %s",
+	sr_strerror(rc));
+	*/
+	INF_MSG("Succesfull init");
+	return SR_ERR_OK;
 
 cleanup:
-  context_destroy(&context);
-  return rc;
+	context_destroy(&context);
+	return rc;
 }
 
 /*
@@ -1463,16 +1289,16 @@ cleanup:
  * @param[in] private_ctx context to be released fro memory.
  *
  */
-void sr_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_ctx) {
-  INF("%s", __func__);
-  INF("Plugin cleanup called, private_ctx is %s available.",
-      private_ctx ? "" : "not");
+void sr_plugin_cleanup_cb(sr_session_ctx_t *session, void *private_ctx)
+{
+	INF("%s", __func__);
+	INF("Plugin cleanup called, private_ctx is %s available.", private_ctx ? "" : "not");
 
-  if (NULL != private_ctx) {
-    context_t *context = private_ctx;
-    context_destroy(&context);
-  }
-  INF_MSG("Plugin cleaned-up successfully");
+	if (NULL != private_ctx) {
+		context_t *context = private_ctx;
+		context_destroy(&context);
+	}
+	INF_MSG("Plugin cleaned-up successfully");
 }
 
 
@@ -1491,48 +1317,48 @@ static void sigint_handler(__attribute__((unused)) int signum);
  * @return error code.
  *
  */
-int main(void) {
-  INF_MSG("Plugin application mode initialized");
-  sr_conn_ctx_t *connection = NULL;
-  sr_session_ctx_t *session = NULL;
-  void *private_ctx = NULL;
-  int rc = SR_ERR_OK;
+int main()
+{
+	int rc = SR_ERR_OK;
+	sr_conn_ctx_t *connection = NULL;
+	sr_session_ctx_t *session = NULL;
+	void *private_ctx = NULL;
 
-  /* connect to sysrepo */
-  INF_MSG("Connecting to sysrepo ...");
-  rc = sr_connect(SR_CONN_DEFAULT, &connection);
-  SR_CHECK_RET(rc, cleanup, "Error by sr_connect: %s", sr_strerror(rc));
+	/* connect to sysrepo */
+	INF_MSG("Connecting to sysrepo ...");
+	rc = sr_connect(SR_CONN_DEFAULT, &connection);
+	SR_CHECK_RET(rc, cleanup, "Error by sr_connect: %s", sr_strerror(rc));
 
-  ENABLE_LOGGING(SR_LL_DBG);
+	ENABLE_LOGGING(SR_LL_DBG);
 
-  /* start session */
-  INF_MSG("Starting session ...");
-  rc = sr_session_start(connection, SR_DS_RUNNING, &session);
-  SR_CHECK_RET(rc, cleanup, "Error by sr_session_start: %s", sr_strerror(rc));
+	/* start session */
+	INF_MSG("Starting session ...");
+	rc = sr_session_start(connection, SR_DS_RUNNING, &session);
+	SR_CHECK_RET(rc, cleanup, "Error by sr_session_start: %s", sr_strerror(rc));
 
-  INF_MSG("Initializing plugin ...");
-  rc = sr_plugin_init_cb(session, &private_ctx);
-  SR_CHECK_RET(rc, cleanup, "Error by sr_plugin_init_cb: %s", sr_strerror(rc));
+	INF_MSG("Initializing plugin ...");
+	rc = sr_plugin_init_cb(session, &private_ctx);
+	SR_CHECK_RET(rc, cleanup, "Error by sr_plugin_init_cb: %s", sr_strerror(rc));
 
-  /* loop until ctrl-c is pressed / SIGINT is received */
-  signal(SIGINT, sigint_handler);
-  signal(SIGPIPE, SIG_IGN);
-  while (!exit_application) {
-    sleep(1); /* or do some more useful work... */
-  }
+	/* loop until ctrl-c is pressed / SIGINT is received */
+	signal(SIGINT, sigint_handler);
+	signal(SIGPIPE, SIG_IGN);
+	while (!exit_application) {
+		sleep(1); /* or do some more useful work... */
+	}
 
-  sr_plugin_cleanup_cb(session, private_ctx);
+	sr_plugin_cleanup_cb(session, private_ctx);
 
 cleanup:
-  if (NULL != session) {
-    rc = sr_session_stop(session);
-    if (rc != SR_ERR_OK)
-      INF("cleanup: %s", sr_strerror(rc));
-  }
-  if (NULL != connection) {
-    sr_disconnect(connection);
-  }
-  return rc;
+	if (NULL != session) {
+		rc = sr_session_stop(session);
+		if (rc != SR_ERR_OK)
+			INF("cleanup: %s", sr_strerror(rc));
+	}
+	if (NULL != connection) {
+		sr_disconnect(connection);
+	}
+	return rc;
 }
 
 /*
@@ -1542,9 +1368,10 @@ cleanup:
  *
  * @note signum is not used.
  */
-static void sigint_handler(__attribute__((unused)) int signum) {
-  INF_MSG("Sigint called, exiting...");
-  exit_application = 1;
+static void sigint_handler(__attribute__((unused)) int signum)
+{
+	INF_MSG("Sigint called, exiting...");
+	exit_application = 1;
 }
 
 #endif
