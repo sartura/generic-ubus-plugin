@@ -34,12 +34,11 @@
 #include "ubus_object.h"
 
 /*================Structure definition========================================*/
-struct context_s
-{
-	sr_session_ctx_t *session;           // holds the sysrepo session
+struct context_s {
+	sr_session_ctx_t *session;			 // holds the sysrepo session
 	sr_subscription_ctx_t *subscription; // structure for sysrepo subscriptions
-	sr_session_ctx_t *startup_session;   // session structure for startup DS
-	sr_conn_ctx_t *startup_connection;   // connection structure for startup DS
+	sr_session_ctx_t *startup_session;	 // session structure for startup DS
+	sr_conn_ctx_t *startup_connection;	 // connection structure for startup DS
 
 	char *ubus_object_filter_file_name;
 
@@ -50,7 +49,7 @@ struct context_s
 typedef struct context_s context_t;
 
 /*========================Defines=============================================*/
-#define context_for_each_ubus_object(__ctx, __uo)                              \
+#define context_for_each_ubus_object(__ctx, __uo) \
 	list_for_each_entry(__uo, &__ctx->ubus_object_list, list)
 
 /*=========================Function prototypes================================*/

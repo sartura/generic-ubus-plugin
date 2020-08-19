@@ -35,9 +35,8 @@
 #include "ubus_method.h"
 
 /*================Structure definition========================================*/
-struct ubus_object_s
-{
-	char *name;        // ubus object name
+struct ubus_object_s {
+	char *name;		   // ubus object name
 	char *yang_module; // YANG module for ubus storing ubus result data
 
 	sr_subscription_ctx_t *state_data_subscription; // ubus YANG module state
@@ -45,22 +44,22 @@ struct ubus_object_s
 	// structure
 
 	struct list_head ubus_method_list; // list of ubus methods
-	struct list_head list;             // structure for list
-	// functionalities
+	struct list_head list;			   // structure for list
+									   // functionalities
 };
 
 /*===============================Type definition==============================*/
 typedef struct ubus_object_s ubus_object_t;
 
 /*========================Defines=============================================*/
-#define ubus_object_for_each_ubus_method(__uo, __uom)                          \
+#define ubus_object_for_each_ubus_method(__uo, __uom) \
 	list_for_each_entry(__uom, &__uo->ubus_method_list, list)
 
 /*=========================Function prototypes================================*/
 int ubus_object_create(ubus_object_t **ubus_object);
 int ubus_object_state_data_subscribe(sr_session_ctx_t *session, void *private_ctx,
-				     ubus_object_t *ubus_object,
-				     int (*f)(sr_session_ctx_t *, const char *, const char *, const char *, uint32_t, struct lyd_node **, void *));
+									 ubus_object_t *ubus_object,
+									 int (*f)(sr_session_ctx_t *, const char *, const char *, const char *, uint32_t, struct lyd_node **, void *));
 
 int ubus_object_set_name(ubus_object_t *ubus_object, const char *name);
 int ubus_object_set_yang_module(ubus_object_t *ubus_object, const char *yang_module);

@@ -141,8 +141,8 @@ cleanup:
  * @return error code.
  */
 int ubus_object_state_data_subscribe(sr_session_ctx_t *session, void *private_ctx,
-				     ubus_object_t *ubus_object,
-				     int (*f)(sr_session_ctx_t *, const char *, const char *, const char *, uint32_t, struct lyd_node **, void *))
+									 ubus_object_t *ubus_object,
+									 int (*f)(sr_session_ctx_t *, const char *, const char *, const char *, uint32_t, struct lyd_node **, void *))
 {
 	int rc = SR_ERR_OK;
 	CHECK_NULL_MSG(private_ctx, &rc, cleanup, "input argument private_ctx is null");
@@ -283,8 +283,8 @@ cleanup:
  * @return error code.
  */
 int ubus_object_get_method(ubus_object_t *ubus_object,
-		ubus_method_t **ubus_method,
-		const char *method_name)
+						   ubus_method_t **ubus_method,
+						   const char *method_name)
 {
 	int rc = SR_ERR_OK;
 	CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
@@ -292,8 +292,7 @@ int ubus_object_get_method(ubus_object_t *ubus_object,
 	ubus_method_t *ubus_method_local = NULL;
 	list_for_each_entry(ubus_method_local, &ubus_object->ubus_method_list, list)
 	{
-		if (strncmp(ubus_method_local->name, method_name, strlen(ubus_method_local->name)) == 0)
-		{
+		if (strncmp(ubus_method_local->name, method_name, strlen(ubus_method_local->name)) == 0) {
 			*ubus_method = ubus_method_local;
 			return rc;
 		}
@@ -321,8 +320,7 @@ int ubus_object_unsubscribe(sr_session_ctx_t *session, ubus_object_t *ubus_objec
 	CHECK_NULL_MSG(ubus_object, &rc, cleanup, "input argument ubus_object is null");
 	CHECK_NULL_MSG(session, &rc, cleanup, "input argument session is null");
 
-	if (ubus_object->state_data_subscription != NULL)
-	{
+	if (ubus_object->state_data_subscription != NULL) {
 		INF_MSG("Unsubscribing from operational");
 		rc = sr_unsubscribe(ubus_object->state_data_subscription);
 		SR_CHECK_RET(rc, cleanup, "sr_unsubscribe: %s", sr_strerror(rc));
