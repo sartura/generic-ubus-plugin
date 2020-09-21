@@ -128,6 +128,9 @@ int generic_ubus_load_startup_datastore(context_t *context)
 		goto cleanup;
 	}
 
+	if (!root)
+		goto cleanup;
+
 	LY_TREE_FOR(root->child, child)
 	{
 		LY_TREE_DFS_BEGIN(child, next, node)
